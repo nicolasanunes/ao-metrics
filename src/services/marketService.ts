@@ -15,7 +15,7 @@ export interface PriceData {
 }
 
 export function buildQueryUrl(search: SearchItem): string {
-  const base = import.meta.env.VITE_API_BASE_URL
+  const base = 'https://west.albion-online-data.com/api/v2/stats/prices/'
 
   const ids = search.ids.join(',')
   const locations = search.locations.map((l) => encodeURIComponent(l)).join(',')

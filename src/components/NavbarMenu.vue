@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 
 <template>
   <nav
-    class="flex items-center justify-between mb-4 px-4 md:px-8 lg:px-16 xl:px-32 2xl:px-64 py-3 bg-gray-950 border-b border-gray-800"
+    class="flex items-center justify-between px-4 md:px-8 lg:px-16 xl:px-32 2xl:px-64 py-3 bg-gray-950 border-b border-gray-800"
   >
     <span class="font-semibold text-lg text-gray-100">AO Metrics</span>
     <div class="flex gap-2">

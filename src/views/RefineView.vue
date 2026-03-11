@@ -43,15 +43,16 @@ const BASE_FOCUS: Record<number, number> = {
   8: 3600,
 }
 
-// Nutrition consumed per refine action, by tier (subtiers use same value as base tier)
-const NUTRITION: Record<number, number> = {
-  2: 8,
-  3: 16,
-  4: 28,
-  5: 44,
-  6: 72,
-  7: 112,
-  8: 176,
+// Item Value (IV) per tier and enchantment — nutrition = IV × 0.1125
+// T2 has no nutrition cost. T3 has no enchantment. T4–T8 have .0–.4.
+const ITEM_VALUE: Record<number, Record<number, number>> = {
+  2: { 0: 0 },
+  3: { 0: 8 },
+  4: { 0: 16, 1: 32, 2: 64, 3: 128, 4: 256 },
+  5: { 0: 32, 1: 64, 2: 128, 3: 256, 4: 512 },
+  6: { 0: 64, 1: 128, 2: 256, 3: 512, 4: 1024 },
+  7: { 0: 128, 1: 256, 2: 512, 3: 1024, 4: 2048 },
+  8: { 0: 256, 1: 512, 2: 1024, 3: 2048, 4: 4096 },
 }
 
 const MATERIAL_OPTIONS: { value: MaterialType; label: string }[] = [
@@ -69,9 +70,9 @@ const ALL_CITIES = Object.values(Location)
 // ── State ──────────────────────────────────────────────────────────────────
 const material = ref<MaterialType>('wood')
 const tier = ref(5)
-const subtier = ref(0)
-const stoneSubtier = ref(0)
-const city = ref<Location>(Location.Lymhurst)
+const enchantment = ref(0)
+const stoneEnchantment = ref(0)
+const city = ref<Location>(Location.FortSterling)
 const eventBonus = ref(0)
 const useFocus = ref(false)
 const specLevel = ref(0)
@@ -85,37 +86,38 @@ const stationFee = ref(0) // prata por 100 de nutrição
 // ── Derived values ─────────────────────────────────────────────────────────
 // Reset subtiers on material/tier change
 watch(material, (m) => {
-  if (m === 'stone') subtier.value = 0
-  else stoneSubtier.value = 0
+  if (m === 'stone') enchantment.value = 0
+  else stoneEnchantment.value = 0
+  city.value = CITY_BONUS[m]
 })
 watch(tier, (t) => {
   if (t < 4) {
-    subtier.value = 0
-    stoneSubtier.value = 0
+    enchantment.value = 0
+    stoneEnchantment.value = 0
   }
 })
 
 // Non-stone subtiers only from T4 upward
 const hasSubtiers = computed(() => material.value !== 'stone' && tier.value >= 4)
-// Stone recipe variants: raw stone has subtier .0–.3 for T4+; output block never has subtier
+// Stone recipe variants: raw stone has enchantment .0–.3 for T4+; output block never has enchantment
 const hasStoneSubtier = computed(() => material.value === 'stone' && tier.value >= 4)
 
-// Sub-ingredient quantity: 2^stoneSubtier for stone T4+, otherwise 1 (or 0 for T2)
+// Sub-ingredient quantity: 2^stoneEnchantment for stone T4+, otherwise 1 (or 0 for T2)
 const subQty = computed(() => {
   if (!hasSubIngredient.value) return 0
-  if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneSubtier.value)
+  if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneEnchantment.value)
   return 1
 })
-// Output yield per refine action: 2^stoneSubtier for stone T4+, otherwise always 1
+// Output yield per refine action: 2^stoneEnchantment for stone T4+, otherwise always 1
 const outputYield = computed(() => {
-  if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneSubtier.value)
+  if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneEnchantment.value)
   return 1
 })
-// Tier label for the raw material (stone raw has stoneSubtier, other materials share subtier)
+// Tier label for the raw material (stone raw has stoneEnchantment, other materials share enchantment)
 const rawTierLabel = computed(() =>
   material.value === 'stone'
-    ? tierLabel(tier.value, stoneSubtier.value)
-    : tierLabel(tier.value, subtier.value),
+    ? tierLabel(tier.value, stoneEnchantment.value)
+    : tierLabel(tier.value, enchantment.value),
 )
 
 const SUBTIER_COLORS: Record<number, string> = {
@@ -137,35 +139,37 @@ const hasSubIngredient = computed(() => tier.value > 2)
 const mat = computed(() => MATERIALS[material.value])
 
 /**
- * Return Rate formula (Albion Online):
- *
- *   efficiency = 1 + cityBonus + eventBonus [+ 0.5 if using focus]
- *   RRR = 1 - (1 - 0.152) / efficiency
- *
- *   cityBonus       = 0.40 when refining in the bonus city, else 0
- *   eventBonus      = 0 | 0.10 | 0.20
- *   focusEfficiency = 0.50 (fixed, regardless of spec level)
- *
- * Spec level ONLY reduces focus cost: focusCost = base × (1 - spec × 0.005)
- * Spec has NO effect on the return rate.
+ * Exact return rates as shown in the Albion Online UI.
+ * Values do NOT depend on spec, tier, or quantity.
+ * Spec only reduces focus cost (0.5% per level).
  */
-const BASE_RRR = 0.152
-const CITY_BONUS_VALUE = 0.4
-const FOCUS_EFFICIENCY = 0.5
+const RRR_TABLE: Record<
+  'noBonusCity' | 'bonusCity',
+  Record<number, { noFocus: number; focus: number }>
+> = {
+  noBonusCity: {
+    0: { noFocus: 0.152, focus: 0.439 },
+    10: { noFocus: 0.237, focus: 0.489 },
+    20: { noFocus: 0.293, focus: 0.528 },
+  },
+  bonusCity: {
+    0: { noFocus: 0.367, focus: 0.559 },
+    10: { noFocus: 0.435, focus: 0.584 },
+    20: { noFocus: 0.47, focus: 0.596 },
+  },
+}
 
-// Return rate without focus
+// Return rate without focus (used for the no-focus portion of a budget-limited run)
 const returnRateNoFocus = computed(() => {
-  const cb = hasBonusCity.value ? CITY_BONUS_VALUE : 0
-  const eb = eventBonus.value / 100
-  return 1 - (1 - BASE_RRR) / (1 + cb + eb)
+  const key = hasBonusCity.value ? 'bonusCity' : 'noBonusCity'
+  return RRR_TABLE[key][eventBonus.value]?.noFocus ?? 0.152
 })
 
-// Return rate with focus: adds fixed +0.5 to the efficiency denominator
+// Return rate for the active configuration
 const returnRate = computed(() => {
-  if (!useFocus.value) return returnRateNoFocus.value
-  const cb = hasBonusCity.value ? CITY_BONUS_VALUE : 0
-  const eb = eventBonus.value / 100
-  return 1 - (1 - BASE_RRR) / (1 + cb + eb + FOCUS_EFFICIENCY)
+  const key = hasBonusCity.value ? 'bonusCity' : 'noBonusCity'
+  const row = RRR_TABLE[key][eventBonus.value]
+  return useFocus.value ? (row?.focus ?? 0.152) : (row?.noFocus ?? 0.152)
 })
 
 const returnRatePct = computed(() => (returnRate.value * 100).toFixed(1))
@@ -197,7 +201,7 @@ const subReturnTotal = computed(() => subReturn.value * refineActions.value)
 const totalReturnTotal = computed(() => totalReturn.value * refineActions.value)
 
 // Scaled by quantity
-// Refine actions needed (one action can yield multiple items for stone with subtier)
+// Refine actions needed (one action can yield multiple items for stone with enchantment)
 const refineActions = computed(() => Math.ceil(quantity.value / outputYield.value))
 
 // Focus budget split
@@ -236,9 +240,12 @@ const totalCost = computed(() => costPerItem.value * quantity.value)
 const totalFocus = computed(() => focusUsed.value)
 
 // Nutrition cost
-// Standard formula: nutritionCostPerAction = (nutritionTier × stationFee) / 100  (per craft action)
-// Total = per-action × number of refine actions; per-item = total ÷ quantity
-const nutritionPerAction = computed(() => NUTRITION[tier.value] ?? 0)
+// nutrition = ItemValue × 0.1125  →  cost = nutrition × stationFee / 100
+const itemValue = computed(() => {
+  const effectiveSubtier = material.value === 'stone' ? stoneEnchantment.value : enchantment.value
+  return ITEM_VALUE[tier.value]?.[effectiveSubtier] ?? ITEM_VALUE[tier.value]?.[0] ?? 0
+})
+const nutritionPerAction = computed(() => itemValue.value * 0.1125)
 const nutritionCostPerAction = computed(() => (nutritionPerAction.value * stationFee.value) / 100)
 const totalNutritionCost = computed(() => nutritionCostPerAction.value * refineActions.value)
 const nutritionCostPerItem = computed(() =>
@@ -297,9 +304,9 @@ function marginBgClass(pct: number | null): string {
     </p>
 
     <!-- ── Row 1: Material + Tier ─────────────────────────────────────────── -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- Material selector -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Material</h2>
         <div class="flex flex-col gap-1.5">
           <button
@@ -324,8 +331,25 @@ function marginBgClass(pct: number | null): string {
         </div>
       </div>
 
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
       <!-- Tier selector -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Tier</h2>
         <div class="grid grid-cols-4 gap-2 mb-3">
           <button
@@ -343,17 +367,17 @@ function marginBgClass(pct: number | null): string {
           </button>
         </div>
 
-        <!-- Subtier selector (non-stone) -->
+        <!-- Enchantment selector (non-stone) -->
         <div v-if="hasSubtiers" class="mb-3">
-          <p class="text-xs text-gray-500 mb-1.5">Subtier</p>
+          <p class="text-xs text-gray-500 mb-1.5">Encantamento</p>
           <div class="flex gap-1.5 flex-wrap">
             <button
               v-for="s in [0, 1, 2, 3, 4]"
               :key="s"
-              @click="subtier = s"
+              @click="enchantment = s"
               :class="[
                 'px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer',
-                subtier === s
+                enchantment === s
                   ? (SUBTIER_COLORS[s] ?? 'bg-gray-600 text-gray-100')
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700',
               ]"
@@ -363,17 +387,17 @@ function marginBgClass(pct: number | null): string {
           </div>
         </div>
 
-        <!-- Stone recipe variant selector: selects which raw stone subtier to use -->
+        <!-- Stone recipe variant selector: selects which raw stone enchantment to use -->
         <div v-if="hasStoneSubtier" class="mb-3">
-          <p class="text-xs text-gray-500 mb-1.5">Receita (subtier da pedra)</p>
+          <p class="text-xs text-gray-500 mb-1.5">Receita (enchantment da pedra)</p>
           <div class="flex gap-2 flex-wrap">
             <button
               v-for="s in [0, 1, 2, 3]"
               :key="s"
-              @click="stoneSubtier = s"
+              @click="stoneEnchantment = s"
               :class="[
                 'px-3 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer text-center min-w-[3rem]',
-                stoneSubtier === s
+                stoneEnchantment === s
                   ? (SUBTIER_COLORS[s] ?? 'bg-gray-600 text-gray-100')
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700',
               ]"
@@ -396,21 +420,38 @@ function marginBgClass(pct: number | null): string {
             <span v-if="hasSubIngredient" class="text-gray-500 text-xs">+</span>
             <span v-if="hasSubIngredient" class="bg-gray-700 text-yellow-300 px-2 py-1 rounded">
               <strong>{{ subQty }}×</strong> {{ mat.refinedName }}
-              {{ tierLabel(tier - 1, tier > 4 ? subtier : 0) }}
+              {{ tierLabel(tier - 1, tier > 4 ? enchantment : 0) }}
             </span>
             <span class="text-gray-500 text-xs">→</span>
             <span
               class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-2 py-1 rounded"
             >
               <strong>{{ outputYield }}×</strong> {{ mat.refinedName }}
-              {{ tierLabel(tier, subtier) }}
+              {{ tierLabel(tier, enchantment) }}
             </span>
           </div>
         </div>
       </div>
 
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
       <!-- City selector -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Cidade de Refino
         </h2>
@@ -434,10 +475,17 @@ function marginBgClass(pct: number | null): string {
       </div>
     </div>
 
+    <!-- ▸ arrow between rows — mobile only -->
+    <div class="flex md:hidden items-center justify-center text-gray-600 mb-2">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+      </svg>
+    </div>
+
     <!-- ── Row 2: Event bonus + Focus + Prices ────────────────────────────── -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- Event bonus -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Bônus de Evento Diário
         </h2>
@@ -496,8 +544,25 @@ function marginBgClass(pct: number | null): string {
         </div>
       </div>
 
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
       <!-- Prices -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Preços (prata)
         </h2>
@@ -516,7 +581,7 @@ function marginBgClass(pct: number | null): string {
           </div>
           <div v-if="hasSubIngredient">
             <label class="text-xs text-gray-400 mb-1 block">
-              Preço de {{ mat.refinedName }} {{ tierLabel(tier - 1, tier > 4 ? subtier : 0) }}
+              Preço de {{ mat.refinedName }} {{ tierLabel(tier - 1, tier > 4 ? enchantment : 0) }}
             </label>
             <input
               type="number"
@@ -541,7 +606,7 @@ function marginBgClass(pct: number | null): string {
           </div>
           <div>
             <label class="text-xs text-gray-400 mb-1 block">
-              Preço de venda de {{ mat.refinedName }} {{ tierLabel(tier, subtier) }}
+              Preço de venda de {{ mat.refinedName }} {{ tierLabel(tier, enchantment) }}
               <span class="text-gray-600">(opcional)</span>
             </label>
             <input
@@ -555,8 +620,25 @@ function marginBgClass(pct: number | null): string {
         </div>
       </div>
 
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
       <!-- Quantity + active config summary -->
-      <div class="bg-gray-900 rounded-xl p-4 flex flex-col gap-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex flex-col gap-4 flex-1">
         <div>
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
             Quantidade a Produzir
@@ -627,9 +709,11 @@ function marginBgClass(pct: number | null): string {
         </div>
         <div class="bg-gray-800 rounded-xl p-4 text-center">
           <p class="text-xs text-gray-400 mb-1">Custo total (×{{ quantity }})</p>
-          <p class="text-2xl font-bold text-yellow-300">{{ fmt(totalCost) }}</p>
+          <p class="text-2xl font-bold text-yellow-300">
+            {{ fmt(totalCost + totalNutritionCost) }}
+          </p>
           <p v-if="stationFee > 0" class="text-xs text-orange-400 mt-1">
-            + {{ fmt(totalNutritionCost) }} nutrição
+            {{ fmt(totalCost) }} materiais + {{ fmt(totalNutritionCost) }} nutrição
           </p>
         </div>
         <div class="bg-gray-800 rounded-xl p-4 text-center">
@@ -686,7 +770,7 @@ function marginBgClass(pct: number | null): string {
               class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
             >
               <td class="px-3 py-2 text-yellow-300">
-                {{ mat.refinedName }} {{ tierLabel(tier - 1, tier > 4 ? subtier : 0) }}
+                {{ mat.refinedName }} {{ tierLabel(tier - 1, tier > 4 ? enchantment : 0) }}
               </td>
               <td class="px-3 py-2 text-gray-400">{{ subQty }}×</td>
               <td class="px-3 py-2">{{ fmt(subPrice) }}</td>
@@ -796,7 +880,7 @@ function marginBgClass(pct: number | null): string {
       </div>
 
       <!-- Nutrition breakdown -->
-      <div class="bg-orange-900/20 border border-orange-700/40 rounded-xl p-4 mb-6">
+      <div class="bg-orange-900/20 border border-orange-700/40 rounded-xl p-4">
         <h3 class="text-sm font-semibold text-orange-300 uppercase tracking-wider mb-2">
           Nutrição da Estação
         </h3>
@@ -869,19 +953,19 @@ function marginBgClass(pct: number | null): string {
       </div>
 
       <!-- Formula note -->
-      <div class="mt-5 bg-gray-800/50 rounded-lg p-3 text-xs text-gray-500">
+      <!-- <div class="mt-5 bg-gray-800/50 rounded-lg p-3 text-xs text-gray-500">
         <p class="font-semibold text-gray-400 mb-1">Como o cálculo funciona</p>
         <p>
-          <strong class="text-gray-300">Fórmula do retorno</strong>: RRR = 1 − (1 − 0,152) / (1 +
-          cityBonus + eventBonus [+ 0,50 com foco]), onde cityBonus = 0,40 na cidade correta (0 nas
-          demais), eventBonus = 0 / 0,10 / 0,20, foco adiciona eficiência fixa de 0,50
-          independentemente da spec. A spec só reduz o custo de foco em 0,5% por nível (50% máx.).
-          <strong class="text-gray-300">Custo líquido</strong> = custo bruto × (1 − RRR).
-          <strong class="text-gray-300">Custo de nutrição por item</strong> = (nutrição do tier ×
-          taxa da estação ÷ 100) ÷ yield por refino. O lucro desconta tanto o custo de materiais
-          quanto o custo de nutrição.
+          <strong class="text-gray-300">Taxa de retorno</strong>: valores fixos conforme a interface
+          do jogo (não dependem de tier, spec ou quantidade). Sem cidade: 15,2% / 23,7% / 29,3%
+          (evento 0/10/20%); com cidade: 36,7% / 43,5% / 47,0%; com foco: +28,7pp / +25,2pp /
+          +23,5pp / +19,2pp / +14,9pp / +12,6pp respectivamente. A spec só reduz o custo de foco em
+          0,5% por nível (50% máx.). <strong class="text-gray-300">Custo líquido</strong> = custo
+          bruto × (1 − RRR). <strong class="text-gray-300">Custo de nutrição por item</strong> =
+          (nutrição do tier × taxa da estação ÷ 100) ÷ yield por refino. O lucro desconta tanto o
+          custo de materiais quanto o custo de nutrição.
         </p>
-      </div>
+      </div> -->
     </div>
   </div>
 </template>

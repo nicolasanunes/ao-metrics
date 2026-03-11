@@ -224,9 +224,9 @@ function dateBgClass(dateStr: string): string {
   <div class="min-h-screen bg-gray-950/90 text-gray-100 rounded-lg p-6">
     <h1 class="text-2xl font-bold mb-6 text-yellow-400">AO Market Search</h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- Items -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Itens</h2>
 
         <div class="text-xs text-gray-500 mb-2" v-if="itemsStore.loading">Carregando items...</div>
@@ -265,7 +265,6 @@ function dateBgClass(dateStr: string): string {
               >
                 {{ tierBadge(item.id).label }}
               </span>
-              <span class="text-yellow-300/70 text-xs font-mono mr-1">{{ item.id }}</span>
               {{ item.name }}
             </li>
           </ul>
@@ -295,8 +294,25 @@ function dateBgClass(dateStr: string): string {
         </div>
       </div>
 
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
       <!-- Locations -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Localidades</h2>
           <button
@@ -321,8 +337,25 @@ function dateBgClass(dateStr: string): string {
         </label>
       </div>
 
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
       <!-- Quality -->
-      <div class="bg-gray-900 rounded-xl p-4">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Qualidades
         </h2>

@@ -5,12 +5,108 @@ import { Location } from '@/types/items'
 type MaterialType = 'wood' | 'hide' | 'ore' | 'stone' | 'fiber'
 
 const MATERIALS = {
-  wood: { rawName: 'Tronco', refinedName: 'Tábua', label: 'Madeira' },
-  hide: { rawName: 'Pelego Bruto', refinedName: 'Couro', label: 'Pelego' },
-  ore: { rawName: 'Minério', refinedName: 'Barra de Metal', label: 'Minério' },
-  stone: { rawName: 'Pedra Bruta', refinedName: 'Bloco de Pedra', label: 'Pedra' },
-  fiber: { rawName: 'Fibra Bruta', refinedName: 'Tecido', label: 'Fibra' },
-} satisfies Record<MaterialType, { rawName: string; refinedName: string; label: string }>
+  wood: { label: 'Madeira' },
+  hide: { label: 'Pelego' },
+  ore: { label: 'Minério' },
+  stone: { label: 'Pedra' },
+  fiber: { label: 'Fibra' },
+} satisfies Record<MaterialType, { label: string }>
+
+const RAW_NAMES: Record<MaterialType, Record<number, string>> = {
+  wood: {
+    2: 'Troncos de Bétula',
+    3: 'Troncos de Castanheira',
+    4: 'Troncos de Pinho',
+    5: 'Troncos de Cedro',
+    6: 'Troncos de Carvalho-sangue',
+    7: 'Troncos de Freixo',
+    8: 'Troncos de Pau-branco',
+  },
+  hide: {
+    2: 'Pelego Rústico',
+    3: 'Pelego Fino',
+    4: 'Pelego Médio',
+    5: 'Pelego Pesado',
+    6: 'Pelego Robusto',
+    7: 'Pelego Grosso',
+    8: 'Pelego Resistente',
+  },
+  ore: {
+    2: 'Minério de Cobre',
+    3: 'Minério de Estanho',
+    4: 'Minério de Ferro',
+    5: 'Minério de Titânio',
+    6: 'Minério de Runita',
+    7: 'Minério de Meteorito',
+    8: 'Minério de Adamântio',
+  },
+  stone: {
+    2: 'Calcário',
+    3: 'Arenito',
+    4: 'Travertino',
+    5: 'Granito',
+    6: 'Ardósia',
+    7: 'Basalto',
+    8: 'Mármore',
+  },
+  fiber: {
+    2: 'Algodão',
+    3: 'Linho',
+    4: 'Cânhamo',
+    5: 'Verbena',
+    6: 'Algodão-vermelho',
+    7: 'Linhossol',
+    8: 'Cânhamo-fantasma',
+  },
+}
+
+const REFINED_NAMES: Record<MaterialType, Record<number, string>> = {
+  wood: {
+    2: 'Tábuas de Bétula',
+    3: 'Tábuas de Castanheira',
+    4: 'Tábuas de Pinho',
+    5: 'Tábuas de Cedro',
+    6: 'Tábuas de Carvalho-sangue',
+    7: 'Tábuas de Freixo',
+    8: 'Tábuas de Pau-branco',
+  },
+  hide: {
+    2: 'Couro Esticado',
+    3: 'Couro Grosso',
+    4: 'Couro Trabalhado',
+    5: 'Couro Curtido',
+    6: 'Couro Endurecido',
+    7: 'Couro Reforçado',
+    8: 'Couro Fortificado',
+  },
+  ore: {
+    2: 'Barra de Cobre',
+    3: 'Barra de Bronze',
+    4: 'Barra de Aço',
+    5: 'Barra de Aço Titânio',
+    6: 'Barra de Aço Runita',
+    7: 'Barra de Aço Meteorito',
+    8: 'Barra de Aço Adamântio',
+  },
+  stone: {
+    2: 'Bloco de Calcário',
+    3: 'Bloco de Arenito',
+    4: 'Bloco de Travertino',
+    5: 'Bloco de Granito',
+    6: 'Bloco de Ardósia',
+    7: 'Bloco de Basalto',
+    8: 'Bloco de Mármore',
+  },
+  fiber: {
+    2: 'Tecido Simples',
+    3: 'Tecido Limpo',
+    4: 'Tecido Fino',
+    5: 'Tecido Ornado',
+    6: 'Tecido Rico',
+    7: 'Tecido Opulento',
+    8: 'Tecido Barroco',
+  },
+}
 
 // Base return rate: 15.2% in any city; 36.7% in the bonus city for that material
 const CITY_BONUS: Record<MaterialType, Location> = {
@@ -32,17 +128,6 @@ const RAW_QTY: Record<number, number> = {
   8: 5,
 }
 
-// Approximate base focus cost (at specialization 0) per refine action, by tier
-const BASE_FOCUS: Record<number, number> = {
-  2: 75,
-  3: 140,
-  4: 260,
-  5: 500,
-  6: 960,
-  7: 1860,
-  8: 3600,
-}
-
 // Item Value (IV) per tier and enchantment — nutrition = IV × 0.1125
 // T2 has no nutrition cost. T3 has no enchantment. T4–T8 have .0–.4.
 const ITEM_VALUE: Record<number, Record<number, number>> = {
@@ -55,12 +140,12 @@ const ITEM_VALUE: Record<number, Record<number, number>> = {
   8: { 0: 256, 1: 512, 2: 1024, 3: 2048, 4: 4096 },
 }
 
-const MATERIAL_OPTIONS: { value: MaterialType; label: string }[] = [
-  { value: 'wood', label: 'Madeira' },
-  { value: 'hide', label: 'Pelego' },
-  { value: 'ore', label: 'Minério' },
-  { value: 'stone', label: 'Pedra' },
-  { value: 'fiber', label: 'Fibra' },
+const MATERIAL_OPTIONS: { value: MaterialType; label: string; recipe: string }[] = [
+  { value: 'wood', label: 'Madeira', recipe: 'Tronco → Tábua' },
+  { value: 'hide', label: 'Pelego', recipe: 'Pelego → Couro' },
+  { value: 'ore', label: 'Minério', recipe: 'Minério → Barra' },
+  { value: 'stone', label: 'Pedra', recipe: 'Pedra → Bloco' },
+  { value: 'fiber', label: 'Fibra', recipe: 'Fibra → Tecido' },
 ]
 
 const TIER_OPTIONS = [2, 3, 4, 5, 6, 7, 8]
@@ -113,12 +198,6 @@ const outputYield = computed(() => {
   if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneEnchantment.value)
   return 1
 })
-// Tier label for the raw material (stone raw has stoneEnchantment, other materials share enchantment)
-const rawTierLabel = computed(() =>
-  material.value === 'stone'
-    ? tierLabel(tier.value, stoneEnchantment.value)
-    : tierLabel(tier.value, enchantment.value),
-)
 
 const SUBTIER_COLORS: Record<number, string> = {
   0: 'bg-gray-600 text-gray-100',
@@ -132,54 +211,66 @@ function tierLabel(t: number, s: number = 0): string {
   return s > 0 ? `T${t}.${s}` : `T${t}`
 }
 
+function tierBadge(t: number, s: number = 0): { label: string; classes: string } {
+  return { label: tierLabel(t, s), classes: SUBTIER_COLORS[s] ?? 'bg-gray-600 text-gray-100' }
+}
+
 const bonusCity = computed(() => CITY_BONUS[material.value])
 const hasBonusCity = computed(() => city.value === bonusCity.value)
 const rawQty = computed(() => RAW_QTY[tier.value])
 const hasSubIngredient = computed(() => tier.value > 2)
 const mat = computed(() => MATERIALS[material.value])
 
+// Tier-specific resource names
+const rawName = computed(() => RAW_NAMES[material.value][tier.value] ?? '')
+const refinedName = computed(() => REFINED_NAMES[material.value][tier.value] ?? '')
+const subRefinedName = computed(() => REFINED_NAMES[material.value][tier.value - 1] ?? '')
+// Badge for the raw input (stone uses stoneEnchantment, others use enchantment)
+const rawBadge = computed(() =>
+  tierBadge(tier.value, material.value === 'stone' ? stoneEnchantment.value : enchantment.value),
+)
+const subBadge = computed(() => tierBadge(tier.value - 1, tier.value > 4 ? enchantment.value : 0))
+const refinedBadge = computed(() => tierBadge(tier.value, enchantment.value))
+
 /**
  * Exact return rates as shown in the Albion Online UI.
  * Values do NOT depend on spec, tier, or quantity.
  * Spec only reduces focus cost (0.5% per level).
  */
-const RRR_TABLE: Record<
-  'noBonusCity' | 'bonusCity',
-  Record<number, { noFocus: number; focus: number }>
-> = {
-  noBonusCity: {
-    0: { noFocus: 0.152, focus: 0.439 },
-    10: { noFocus: 0.237, focus: 0.489 },
-    20: { noFocus: 0.293, focus: 0.528 },
-  },
-  bonusCity: {
-    0: { noFocus: 0.367, focus: 0.559 },
-    10: { noFocus: 0.435, focus: 0.584 },
-    20: { noFocus: 0.47, focus: 0.596 },
-  },
+const FOCUS_FACTOR = 48
+const BASE_RETURN = 0.152
+const FOCUS_BONUS = 0.5
+const CITY_BONUS_VALUE = 0.4
+
+/**
+ * RRR = 1 - (1 - BASE_RETURN) / (1 + cityBonus + eventBonusFraction + focusBonus)
+ * Spec only reduces focus cost — it does NOT affect return rate.
+ */
+function calcRRR(cityBonus: number, eventBonusFraction: number, focusBonus: number): number {
+  return 1 - (1 - BASE_RETURN) / (1 + cityBonus + eventBonusFraction + focusBonus)
 }
 
-// Return rate without focus (used for the no-focus portion of a budget-limited run)
-const returnRateNoFocus = computed(() => {
-  const key = hasBonusCity.value ? 'bonusCity' : 'noBonusCity'
-  return RRR_TABLE[key][eventBonus.value]?.noFocus ?? 0.152
-})
+// Return rate without focus
+const returnRateNoFocus = computed(() =>
+  calcRRR(hasBonusCity.value ? CITY_BONUS_VALUE : 0, eventBonus.value / 100, 0),
+)
 
 // Return rate for the active configuration
-const returnRate = computed(() => {
-  const key = hasBonusCity.value ? 'bonusCity' : 'noBonusCity'
-  const row = RRR_TABLE[key][eventBonus.value]
-  return useFocus.value ? (row?.focus ?? 0.152) : (row?.noFocus ?? 0.152)
-})
+const returnRate = computed(() =>
+  calcRRR(
+    hasBonusCity.value ? CITY_BONUS_VALUE : 0,
+    eventBonus.value / 100,
+    useFocus.value ? FOCUS_BONUS : 0,
+  ),
+)
 
 const returnRatePct = computed(() => (returnRate.value * 100).toFixed(1))
 
-/** Focus spent per single refine action, reduced by 0.5% per spec level (max 50% at spec 100). */
+/** Focus cost per refine action: ItemValue × 48, reduced 0.5% per spec level (max 50% at spec 100). */
 const focusCostPerRefine = computed(() => {
   if (!useFocus.value) return 0
-  const base = BASE_FOCUS[tier.value] ?? 0
-  const reduction = specLevel.value * 0.005 // 0.5% per level, 50% max at spec 100
-  return Math.round(base * (1 - reduction))
+  const base = itemValue.value * FOCUS_FACTOR
+  return Math.round(base * (1 - specLevel.value * 0.005))
 })
 
 // Cost breakdown for 1 refined item produced (based on full-focus rate, for the detail table)
@@ -297,7 +388,7 @@ function marginBgClass(pct: number | null): string {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950/90 text-gray-100 rounded-lg p-6">
+  <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
     <h1 class="text-2xl font-bold mb-1 text-yellow-400">AO Calculadora de Refino</h1>
     <p class="text-sm text-gray-500 mb-6">
       Calcule o custo de refinar materiais considerando bônus de cidade, evento diário e foco.
@@ -325,7 +416,7 @@ function marginBgClass(pct: number | null): string {
               v-if="material === opt.value"
               class="ml-auto text-xs bg-gray-950/30 px-1.5 py-0.5 rounded"
             >
-              {{ mat.rawName }} → {{ mat.refinedName }}
+              {{ opt.recipe }}
             </span>
           </button>
         </div>
@@ -414,20 +505,33 @@ function marginBgClass(pct: number | null): string {
         <div class="bg-gray-800 rounded-lg p-3">
           <p class="text-xs text-gray-400 mb-2 uppercase tracking-wider">Receita</p>
           <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded">
-              <strong>{{ rawQty }}×</strong> {{ mat.rawName }} {{ rawTierLabel }}
+            <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded flex items-center gap-1.5">
+              <strong>{{ rawQty }}×</strong>
+              <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
+                rawBadge.label
+              }}</span>
+              {{ rawName }}
             </span>
             <span v-if="hasSubIngredient" class="text-gray-500 text-xs">+</span>
-            <span v-if="hasSubIngredient" class="bg-gray-700 text-yellow-300 px-2 py-1 rounded">
-              <strong>{{ subQty }}×</strong> {{ mat.refinedName }}
-              {{ tierLabel(tier - 1, tier > 4 ? enchantment : 0) }}
+            <span
+              v-if="hasSubIngredient"
+              class="bg-gray-700 text-yellow-300 px-2 py-1 rounded flex items-center gap-1.5"
+            >
+              <strong>{{ subQty }}×</strong>
+              <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
+                subBadge.label
+              }}</span>
+              {{ subRefinedName }}
             </span>
             <span class="text-gray-500 text-xs">→</span>
             <span
-              class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-2 py-1 rounded"
+              class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-2 py-1 rounded flex items-center gap-1.5"
             >
-              <strong>{{ outputYield }}×</strong> {{ mat.refinedName }}
-              {{ tierLabel(tier, enchantment) }}
+              <strong>{{ outputYield }}×</strong>
+              <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
+                refinedBadge.label
+              }}</span>
+              {{ refinedName }}
             </span>
           </div>
         </div>
@@ -532,10 +636,9 @@ function marginBgClass(pct: number | null): string {
               class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
             />
             <p v-if="isBudgetLimited" class="text-xs text-yellow-400">
-              Foco suficiente para {{ actionsWithFocus }} ação{{
-                actionsWithFocus !== 1 ? 'es' : ''
-              }}. {{ actionsWithoutFocus }} ação{{ actionsWithoutFocus !== 1 ? 'es' : '' }} sem
-              foco.
+              Foco suficiente para {{ actionsWithFocus }}
+              {{ actionsWithFocus !== 1 ? 'ações' : 'ação' }}. {{ actionsWithoutFocus }}
+              {{ actionsWithoutFocus !== 1 ? 'ações' : 'ação' }} sem foco.
             </p>
             <p v-else-if="useFocus" class="text-xs text-green-400">
               Foco suficiente para toda a produção.
@@ -568,8 +671,12 @@ function marginBgClass(pct: number | null): string {
         </h2>
         <div class="space-y-3">
           <div>
-            <label class="text-xs text-gray-400 mb-1 block">
-              Preço de {{ mat.rawName }} {{ rawTierLabel }}
+            <label class="text-xs text-gray-400 mb-1 flex items-center gap-1.5">
+              Preço de
+              <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
+                rawBadge.label
+              }}</span>
+              {{ rawName }}
             </label>
             <input
               type="number"
@@ -580,8 +687,12 @@ function marginBgClass(pct: number | null): string {
             />
           </div>
           <div v-if="hasSubIngredient">
-            <label class="text-xs text-gray-400 mb-1 block">
-              Preço de {{ mat.refinedName }} {{ tierLabel(tier - 1, tier > 4 ? enchantment : 0) }}
+            <label class="text-xs text-gray-400 mb-1 flex items-center gap-1.5">
+              Preço de
+              <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
+                subBadge.label
+              }}</span>
+              {{ subRefinedName }}
             </label>
             <input
               type="number"
@@ -605,8 +716,12 @@ function marginBgClass(pct: number | null): string {
             <p class="text-xs text-gray-600 mt-1">Nutrição por refino: {{ nutritionPerAction }}</p>
           </div>
           <div>
-            <label class="text-xs text-gray-400 mb-1 block">
-              Preço de venda de {{ mat.refinedName }} {{ tierLabel(tier, enchantment) }}
+            <label class="text-xs text-gray-400 mb-1 flex items-center gap-1.5">
+              Preço de venda de
+              <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
+                refinedBadge.label
+              }}</span>
+              {{ refinedName }}
               <span class="text-gray-600">(opcional)</span>
             </label>
             <input
@@ -655,8 +770,11 @@ function marginBgClass(pct: number | null): string {
         <div>
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Configuração ativa</p>
           <div class="flex flex-wrap gap-1.5 text-xs">
-            <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300">
-              {{ mat.label }} {{ rawTierLabel }}
+            <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300 flex items-center gap-1">
+              <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
+                rawBadge.label
+              }}</span>
+              {{ rawName }}
             </span>
             <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300">
               {{ city }}
@@ -752,7 +870,12 @@ function marginBgClass(pct: number | null): string {
           <tbody>
             <!-- Raw material row -->
             <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
-              <td class="px-3 py-2 text-yellow-300">{{ mat.rawName }} {{ rawTierLabel }}</td>
+              <td class="px-3 py-2 text-yellow-300">
+                <span :class="['text-xs font-bold px-1 rounded mr-1', rawBadge.classes]">{{
+                  rawBadge.label
+                }}</span
+                >{{ rawName }}
+              </td>
               <td class="px-3 py-2 text-gray-400">{{ rawQty }}×</td>
               <td class="px-3 py-2">{{ fmt(rawPrice) }}</td>
               <td class="px-3 py-2 text-red-400">{{ fmt(rawGross) }}</td>
@@ -770,7 +893,10 @@ function marginBgClass(pct: number | null): string {
               class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
             >
               <td class="px-3 py-2 text-yellow-300">
-                {{ mat.refinedName }} {{ tierLabel(tier - 1, tier > 4 ? enchantment : 0) }}
+                <span :class="['text-xs font-bold px-1 rounded mr-1', subBadge.classes]">{{
+                  subBadge.label
+                }}</span
+                >{{ subRefinedName }}
               </td>
               <td class="px-3 py-2 text-gray-400">{{ subQty }}×</td>
               <td class="px-3 py-2">{{ fmt(subPrice) }}</td>
@@ -811,14 +937,12 @@ function marginBgClass(pct: number | null): string {
           <div>
             <p class="text-xs text-gray-500 mb-0.5">Custo base (Spec 0)</p>
             <p class="text-blue-300 font-semibold">
-              {{ (BASE_FOCUS[tier] ?? 0).toLocaleString() }}
+              {{ (itemValue * FOCUS_FACTOR).toLocaleString() }}
             </p>
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-0.5">Redução pela spec</p>
-            <p class="text-blue-300 font-semibold">
-              {{ Math.round(Math.min(specLevel * 0.6, 60)) }} %
-            </p>
+            <p class="text-blue-300 font-semibold">{{ (specLevel * 0.5).toFixed(1) }} %</p>
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-0.5">Foco por refino</p>
@@ -916,9 +1040,11 @@ function marginBgClass(pct: number | null): string {
           </div>
           <div class="bg-gray-800 rounded-xl p-3 text-center">
             <p class="text-xs text-gray-400 mb-1">Custo de refino</p>
-            <p class="text-xl font-bold text-yellow-300">{{ fmt(costPerItem) }}</p>
+            <p class="text-xl font-bold text-yellow-300">
+              {{ fmt(costPerItem + nutritionCostPerItem) }}
+            </p>
             <p v-if="stationFee > 0" class="text-xs text-orange-400 mt-1">
-              + {{ fmt(nutritionCostPerItem) }} nutrição
+              {{ fmt(costPerItem) }} materiais + {{ fmt(nutritionCostPerItem) }} nutrição
             </p>
           </div>
           <div class="bg-gray-800 rounded-xl p-3 text-center">

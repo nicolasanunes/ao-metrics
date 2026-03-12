@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import NavbarMenu from './components/NavbarMenu.vue'
+import AnnotationChest from './components/AnnotationChest.vue'
 </script>
 
 <template>
@@ -7,6 +8,7 @@ import NavbarMenu from './components/NavbarMenu.vue'
   <main class="flex-1 p-4 md:px-8 lg:px-16 xl:px-32 2xl:px-64">
     <RouterView />
   </main>
+  <AnnotationChest />
 </template>
 
 <style scoped></style>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useAnnotationsStore } from '@/stores/annotations'
 
-const visible = ref(true)
+const store = useAnnotationsStore()
+const visible = ref(false)
 const shaking = ref(false)
 
 function onParchmentOpened() {
@@ -13,24 +15,24 @@ function onParchmentOpened() {
 </script>
 
 <template>
-  <!-- Closed state: rolled scroll icon -->
-  <Transition name="closed-scroll">
+  <!-- Closed state: chest icon -->
+  <Transition name="closed-chest">
     <button
       v-if="!visible"
-      class="closed-scroll fixed bottom-1 right-1 xl:bottom-4 xl:right-4 z-50 select-none cursor-pointer"
-      aria-label="Abrir pergaminho"
+      class="closed-chest fixed bottom-1 left-1 xl:bottom-4 xl:left-4 z-50 select-none cursor-pointer"
+      aria-label="Abrir baú de anotações"
       @click="visible = true"
     >
-      <img src="/textures/pergaminho-fechado.svg" alt="Pergaminho fechado" />
+      <img src="/textures/bau-aberto.svg" alt="Baú de anotações" />
     </button>
   </Transition>
 
-  <!-- Open state: full parchment -->
+  <!-- Open state: parchment with notes -->
   <Transition name="note" @after-enter="onParchmentOpened">
     <div
       v-if="visible"
       :class="[
-        'fixed bottom-1 right-1 xl:bottom-4 xl:right-4 z-50 parchment-wrapper select-none',
+        'fixed bottom-1 left-1 xl:bottom-4 xl:left-4 z-50 parchment-wrapper select-none',
         { 'parchment-shake': shaking },
       ]"
       style="filter: drop-shadow(0 10px 32px rgba(0, 0, 0, 0.8))"
@@ -43,47 +45,23 @@ function onParchmentOpened() {
       >
         <!-- Title -->
         <h3 class="parchment-title text-center text-sm font-bold mb-1 tracking-widest uppercase">
-          ☠ Legenda de Datas ☠
+          ☠ Baú de Anotações ☠
         </h3>
 
         <!-- Divider -->
         <div class="parchment-divider mb-3" />
 
-        <!-- Legend items -->
-        <ul class="space-y-1 ml-3">
-          <li class="flex items-center gap-3">
-            <span class="color-dot bg-blue-700 flex-shrink-0" />
-            <span class="legend-text">
-              <strong>Azul</strong> - Atualizado há menos de <strong>1 hora</strong>
-            </span>
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="color-dot bg-green-700 flex-shrink-0" />
-            <span class="legend-text">
-              <strong>Verde</strong> - Entre <strong>1h</strong> e <strong>6h</strong> atrás
-            </span>
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="color-dot bg-yellow-500 flex-shrink-0" />
-            <span class="legend-text">
-              <strong>Amarelo</strong> - Entre <strong>6h</strong> e <strong>24h</strong> atrás
-            </span>
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="color-dot bg-red-700 flex-shrink-0" />
-            <span class="legend-text">
-              <strong>Vermelho</strong> - Mais de <strong>24 horas</strong> atrás
-            </span>
-          </li>
-          <li class="flex items-center gap-3">
-            <span class="color-dot bg-gray-400 flex-shrink-0" />
-            <span class="legend-text"> <strong>Sem cor</strong> - Dado indisponível </span>
-          </li>
-        </ul>
+        <!-- Notes textarea -->
+        <textarea
+          v-model="store.notes"
+          class="notes-textarea"
+          placeholder="Escreva suas anotações aqui..."
+          @click.stop
+        />
 
         <!-- Footer -->
-        <div class="parchment-divider mt-4 mb-2" />
-        <p class="legend-footer text-center text-xs italic">⚓ Horários exibidos em UTC ⚓</p>
+        <div class="parchment-divider mt-3 mb-2" />
+        <p class="legend-footer text-center text-xs italic">⚓ Clique aqui para fechar ⚓</p>
       </div>
     </div>
   </Transition>
@@ -112,12 +90,6 @@ function onParchmentOpened() {
   font-family: Georgia, 'Times New Roman', serif;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.28);
   letter-spacing: 0.1em;
-}
-
-/* Subtitle */
-.parchment-subtitle {
-  color: #5c3212;
-  font-family: Georgia, 'Times New Roman', serif;
 }
 
 /* Ornamental divider line */
@@ -149,27 +121,31 @@ function onParchmentOpened() {
   right: 8%;
 }
 
-/* Legend text */
-.legend-text {
+/* Notes textarea */
+.notes-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  background: transparent;
+  border: none;
+  outline: none;
   color: #1e0c02;
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 0.74rem;
-  line-height: 1.35;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  padding: 4px 12px;
+  cursor: text;
 }
-.legend-text strong {
-  color: #0f0501;
+.notes-textarea::placeholder {
+  color: rgba(90, 52, 12, 0.5);
+  font-style: italic;
 }
-
-/* Color indicator dots */
-.color-dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
+.notes-textarea::-webkit-scrollbar {
+  width: 4px;
+}
+.notes-textarea::-webkit-scrollbar-thumb {
+  background: rgba(90, 52, 12, 0.4);
   border-radius: 2px;
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 /* Footer text */
@@ -178,7 +154,7 @@ function onParchmentOpened() {
   font-family: Georgia, 'Times New Roman', serif;
 }
 
-/* Closed scroll button */
+/* Closed chest button */
 @keyframes idle-wobble {
   0%,
   8% {
@@ -198,7 +174,7 @@ function onParchmentOpened() {
   }
 }
 
-.closed-scroll {
+.closed-chest {
   background: none;
   border: none;
   padding: 0;
@@ -209,36 +185,36 @@ function onParchmentOpened() {
   animation: idle-wobble 3s ease-in-out infinite;
   transform-origin: bottom center;
 }
-.closed-scroll:hover {
+.closed-chest:hover {
   animation: none;
   transform: scale(1.08) rotate(-3deg);
-  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.8));
 }
-.closed-scroll img {
+.closed-chest img {
   width: 64px;
   height: auto;
   display: block;
 }
 @media (max-width: 640px) {
-  .closed-scroll img {
+  .closed-chest img {
     width: 40px;
   }
 }
 
-/* Closed scroll transition */
-.closed-scroll-enter-active,
-.closed-scroll-leave-active {
+/* Closed chest transition */
+.closed-chest-enter-active,
+.closed-chest-leave-active {
   transition:
     opacity 0.5s ease,
     transform 0.5s ease;
 }
-.closed-scroll-enter-from,
-.closed-scroll-leave-to {
+.closed-chest-enter-from,
+.closed-chest-leave-to {
   opacity: 0;
   transform: scale(0.7);
 }
 
-/* Shake on hover */
+/* Shake on open */
 @keyframes shake {
   0% {
     transform: rotate(0deg);
@@ -266,8 +242,7 @@ function onParchmentOpened() {
   }
 }
 .parchment-shake {
-  animation: shake 1s ease;
-  animation-iteration-count: 0.6;
+  animation: shake 0.7s ease;
   transform-origin: center;
 }
 
@@ -280,10 +255,10 @@ function onParchmentOpened() {
 }
 .note-enter-from {
   opacity: 0;
-  transform: translate(60px, 60px) scale(0.7);
+  transform: translate(-60px, 60px) scale(0.7);
 }
 .note-leave-to {
   opacity: 0;
-  transform: translate(60px, 60px) scale(0.7);
+  transform: translate(-60px, 60px) scale(0.7);
 }
 </style>

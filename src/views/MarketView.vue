@@ -62,6 +62,7 @@ function addItem(id: string) {
 
 function removeItem(id: string) {
   selectedItems.value = selectedItems.value.filter((i) => i !== id)
+  search()
 }
 
 const allLocations = Object.values(Location)
@@ -221,7 +222,7 @@ function dateBgClass(dateStr: string): string {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950/90 text-gray-100 rounded-lg p-6">
+  <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
     <h1 class="text-2xl font-bold mb-6 text-yellow-400">AO Market Search</h1>
 
     <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">

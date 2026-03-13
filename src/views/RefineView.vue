@@ -128,16 +128,33 @@ const RAW_QTY: Record<number, number> = {
   8: 5,
 }
 
-// Item Value (IV) per tier and enchantment — nutrition = IV × 0.1125
-// T2 has no nutrition cost. T3 has no enchantment. T4–T8 have .0–.4.
-const ITEM_VALUE: Record<number, Record<number, number>> = {
-  2: { 0: 0 },
+// Item Value (IV) lookup table — used for focus cost and nutrition calculation.
+// Stone output is always base (.0); enchantment only applies to non-stone output.
+const ITEM_VALUE_TABLE: Record<number, Record<number, number>> = {
+  2: { 0: 4 },
   3: { 0: 8 },
   4: { 0: 16, 1: 32, 2: 64, 3: 128, 4: 256 },
   5: { 0: 32, 1: 64, 2: 128, 3: 256, 4: 512 },
   6: { 0: 64, 1: 128, 2: 256, 3: 512, 4: 1024 },
   7: { 0: 128, 1: 256, 2: 512, 3: 1024, 4: 2048 },
   8: { 0: 256, 1: 512, 2: 1024, 3: 2048, 4: 4096 },
+}
+
+// Fixed return rates (%) per scenario — sourced directly from in-game observations.
+// key: `${bonusCity ? 'bonus' : 'other'}_${eventBonus}_${focus ? 'focus' : 'nofocus'}`
+const RRR_TABLE: Record<string, number> = {
+  other_0_nofocus: 0.152,
+  other_10_nofocus: 0.218,
+  other_20_nofocus: 0.269,
+  other_0_focus: 0.435,
+  other_10_focus: 0.465,
+  other_20_focus: 0.495,
+  bonus_0_nofocus: 0.367,
+  bonus_10_nofocus: 0.404,
+  bonus_20_nofocus: 0.438,
+  bonus_0_focus: 0.539,
+  bonus_10_focus: 0.559,
+  bonus_20_focus: 0.578,
 }
 
 const MATERIAL_OPTIONS: { value: MaterialType; label: string; recipe: string }[] = [
@@ -225,6 +242,27 @@ const mat = computed(() => MATERIALS[material.value])
 const rawName = computed(() => RAW_NAMES[material.value][tier.value] ?? '')
 const refinedName = computed(() => REFINED_NAMES[material.value][tier.value] ?? '')
 const subRefinedName = computed(() => REFINED_NAMES[material.value][tier.value - 1] ?? '')
+
+const ENCHANTMENT_SUFFIX: Record<number, string> = {
+  0: '',
+  1: ' Incomum',
+  2: ' Raro',
+  3: ' Excepcional',
+  4: ' Lendário',
+}
+
+// Full display names including enchantment suffix
+const rawDisplayName = computed(() => {
+  const enc = material.value === 'stone' ? stoneEnchantment.value : enchantment.value
+  return rawName.value + (ENCHANTMENT_SUFFIX[enc] ?? '')
+})
+const refinedDisplayName = computed(
+  () => refinedName.value + (ENCHANTMENT_SUFFIX[enchantment.value] ?? ''),
+)
+const subRefinedDisplayName = computed(() => {
+  const enc = tier.value > 4 ? enchantment.value : 0
+  return subRefinedName.value + (ENCHANTMENT_SUFFIX[enc] ?? '')
+})
 // Badge for the raw input (stone uses stoneEnchantment, others use enchantment)
 const rawBadge = computed(() =>
   tierBadge(tier.value, material.value === 'stone' ? stoneEnchantment.value : enchantment.value),
@@ -232,45 +270,40 @@ const rawBadge = computed(() =>
 const subBadge = computed(() => tierBadge(tier.value - 1, tier.value > 4 ? enchantment.value : 0))
 const refinedBadge = computed(() => tierBadge(tier.value, enchantment.value))
 
-/**
- * Exact return rates as shown in the Albion Online UI.
- * Values do NOT depend on spec, tier, or quantity.
- * Spec only reduces focus cost (0.5% per level).
- */
-const FOCUS_FACTOR = 48
-const BASE_RETURN = 0.152
-const FOCUS_BONUS = 0.5
-const CITY_BONUS_VALUE = 0.4
+// Focus cost: BaseFocus[tier] × EnchantMult[enchant] × (1 − spec × 0.005)
+// T2/T3 have no focus cost. Stone output is always base (.0) but uses a fixed multiplier.
+const BASE_FOCUS: Record<number, number> = { 4: 36, 5: 72, 6: 144, 7: 288, 8: 576 }
+const ENCHANT_FOCUS_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 }
+const STONE_BASE_MULT = 1.6470588
 
-/**
- * RRR = 1 - (1 - BASE_RETURN) / (1 + cityBonus + eventBonusFraction + focusBonus)
- * Spec only reduces focus cost — it does NOT affect return rate.
- */
-function calcRRR(cityBonus: number, eventBonusFraction: number, focusBonus: number): number {
-  return 1 - (1 - BASE_RETURN) / (1 + cityBonus + eventBonusFraction + focusBonus)
+function rrrKey(bonusCity: boolean, event: number, focus: boolean): string {
+  return `${bonusCity ? 'bonus' : 'other'}_${event}_${focus ? 'focus' : 'nofocus'}`
 }
 
-// Return rate without focus
-const returnRateNoFocus = computed(() =>
-  calcRRR(hasBonusCity.value ? CITY_BONUS_VALUE : 0, eventBonus.value / 100, 0),
+// Return rate without focus (used for the no-focus portion of a budget-limited run)
+const returnRateNoFocus = computed(
+  () => RRR_TABLE[rrrKey(hasBonusCity.value, eventBonus.value, false)] ?? 0.152,
 )
 
 // Return rate for the active configuration
-const returnRate = computed(() =>
-  calcRRR(
-    hasBonusCity.value ? CITY_BONUS_VALUE : 0,
-    eventBonus.value / 100,
-    useFocus.value ? FOCUS_BONUS : 0,
-  ),
+const returnRate = computed(
+  () => RRR_TABLE[rrrKey(hasBonusCity.value, eventBonus.value, useFocus.value)] ?? 0.152,
 )
 
 const returnRatePct = computed(() => (returnRate.value * 100).toFixed(1))
 
-/** Focus cost per refine action: ItemValue × 48, reduced 0.5% per spec level (max 50% at spec 100). */
+/** Base focus cost before spec reduction (Spec 0). */
+const focusCostBase = computed(() => {
+  const base = BASE_FOCUS[tier.value] ?? 0
+  if (base === 0) return 0
+  if (material.value === 'stone') return base * STONE_BASE_MULT
+  return base * (ENCHANT_FOCUS_MULT[enchantment.value] ?? 1)
+})
+
+/** Focus cost per refine action after spec reduction. */
 const focusCostPerRefine = computed(() => {
-  if (!useFocus.value) return 0
-  const base = itemValue.value * FOCUS_FACTOR
-  return Math.round(base * (1 - specLevel.value * 0.005))
+  if (!useFocus.value || focusCostBase.value === 0) return 0
+  return Math.round(focusCostBase.value * (1 - specLevel.value * 0.005))
 })
 
 // Cost breakdown for 1 refined item produced (based on full-focus rate, for the detail table)
@@ -330,11 +363,11 @@ const costPerItem = computed(() => {
 const totalCost = computed(() => costPerItem.value * quantity.value)
 const totalFocus = computed(() => focusUsed.value)
 
-// Nutrition cost
-// nutrition = ItemValue × 0.1125  →  cost = nutrition × stationFee / 100
+// Nutrition cost: ItemValue × 0.1125  →  cost = nutrition × stationFee / 100
+// Stone output is always base enchantment (.0); other materials use selected enchantment.
 const itemValue = computed(() => {
-  const effectiveSubtier = material.value === 'stone' ? stoneEnchantment.value : enchantment.value
-  return ITEM_VALUE[tier.value]?.[effectiveSubtier] ?? ITEM_VALUE[tier.value]?.[0] ?? 0
+  const enc = material.value === 'stone' ? 0 : enchantment.value
+  return ITEM_VALUE_TABLE[tier.value]?.[enc] ?? 0
 })
 const nutritionPerAction = computed(() => itemValue.value * 0.1125)
 const nutritionCostPerAction = computed(() => (nutritionPerAction.value * stationFee.value) / 100)
@@ -510,7 +543,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
                 rawBadge.label
               }}</span>
-              {{ rawName }}
+              {{ rawDisplayName }}
             </span>
             <span v-if="hasSubIngredient" class="text-gray-500 text-xs">+</span>
             <span
@@ -521,7 +554,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
                 subBadge.label
               }}</span>
-              {{ subRefinedName }}
+              {{ subRefinedDisplayName }}
             </span>
             <span class="text-gray-500 text-xs">→</span>
             <span
@@ -531,7 +564,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
                 refinedBadge.label
               }}</span>
-              {{ refinedName }}
+              {{ refinedDisplayName }}
             </span>
           </div>
         </div>
@@ -676,7 +709,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
                 rawBadge.label
               }}</span>
-              {{ rawName }}
+              {{ rawDisplayName }}
             </label>
             <input
               type="number"
@@ -692,7 +725,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
                 subBadge.label
               }}</span>
-              {{ subRefinedName }}
+              {{ subRefinedDisplayName }}
             </label>
             <input
               type="number"
@@ -721,7 +754,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
                 refinedBadge.label
               }}</span>
-              {{ refinedName }}
+              {{ refinedDisplayName }}
               <span class="text-gray-600">(opcional)</span>
             </label>
             <input
@@ -774,7 +807,7 @@ function marginBgClass(pct: number | null): string {
               <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
                 rawBadge.label
               }}</span>
-              {{ rawName }}
+              {{ rawDisplayName }}
             </span>
             <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300">
               {{ city }}
@@ -874,7 +907,7 @@ function marginBgClass(pct: number | null): string {
                 <span :class="['text-xs font-bold px-1 rounded mr-1', rawBadge.classes]">{{
                   rawBadge.label
                 }}</span
-                >{{ rawName }}
+                >{{ rawDisplayName }}
               </td>
               <td class="px-3 py-2 text-gray-400">{{ rawQty }}×</td>
               <td class="px-3 py-2">{{ fmt(rawPrice) }}</td>
@@ -896,7 +929,7 @@ function marginBgClass(pct: number | null): string {
                 <span :class="['text-xs font-bold px-1 rounded mr-1', subBadge.classes]">{{
                   subBadge.label
                 }}</span
-                >{{ subRefinedName }}
+                >{{ subRefinedDisplayName }}
               </td>
               <td class="px-3 py-2 text-gray-400">{{ subQty }}×</td>
               <td class="px-3 py-2">{{ fmt(subPrice) }}</td>
@@ -937,7 +970,7 @@ function marginBgClass(pct: number | null): string {
           <div>
             <p class="text-xs text-gray-500 mb-0.5">Custo base (Spec 0)</p>
             <p class="text-blue-300 font-semibold">
-              {{ (itemValue * FOCUS_FACTOR).toLocaleString() }}
+              {{ focusCostBase.toLocaleString() }}
             </p>
           </div>
           <div>

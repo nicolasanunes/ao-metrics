@@ -177,8 +177,17 @@ const stoneEnchantment = ref(0)
 const city = ref<Location>(Location.FortSterling)
 const eventBonus = ref(0)
 const useFocus = ref(false)
-const specLevel = ref(0)
+const specT4 = ref(0)
+const specT5 = ref(0)
+const specT6 = ref(0)
+const specT7 = ref(0)
+const specT8 = ref(0)
 const focusBudget = ref(30000)
+
+watch(focusBudget, (v) => {
+  if (v > 30000) focusBudget.value = 30000
+  if (v < 0) focusBudget.value = 0
+})
 const rawPrice = ref(0)
 const subPrice = ref(0)
 const quantity = ref(1)
@@ -270,11 +279,38 @@ const rawBadge = computed(() =>
 const subBadge = computed(() => tierBadge(tier.value - 1, tier.value > 4 ? enchantment.value : 0))
 const refinedBadge = computed(() => tierBadge(tier.value, enchantment.value))
 
-// Focus cost: BaseFocus[tier] × EnchantMult[enchant] × (1 − spec × 0.005)
-// T2/T3 have no focus cost. Stone output is always base (.0) but uses a fixed multiplier.
-const BASE_FOCUS: Record<number, number> = { 4: 36, 5: 72, 6: 144, 7: 288, 8: 576 }
-const ENCHANT_FOCUS_MULT: Record<number, number> = { 0: 1, 1: 2, 2: 4, 3: 8, 4: 16 }
-const STONE_BASE_MULT = 1.6470588
+// Base focus cost lookup tables (Spec 0), by tier and enchantment
+const BASE_FOCUS_NORMAL: Record<number, Record<number, number>> = {
+  2: { 0: 18 },
+  3: { 0: 31 },
+  4: { 0: 54, 1: 94, 2: 164, 3: 287, 4: 503 },
+  5: { 0: 94, 1: 164, 2: 287, 3: 503, 4: 880 },
+  6: { 0: 164, 1: 287, 2: 503, 3: 880, 4: 1539 },
+  7: { 0: 287, 1: 503, 2: 880, 3: 1539, 4: 2694 },
+  8: { 0: 503, 1: 880, 2: 1539, 3: 2694, 4: 4714 },
+}
+
+const BASE_FOCUS_STONE: Record<number, Record<number, number>> = {
+  2: { 0: 18 },
+  3: { 0: 31 },
+  4: { 0: 54, 1: 108, 2: 216, 3: 432 },
+  5: { 0: 94, 1: 188, 2: 376, 3: 752 },
+  6: { 0: 164, 1: 328, 2: 656, 3: 1312 },
+  7: { 0: 287, 1: 574, 2: 1148, 3: 2296 },
+  8: { 0: 503, 1: 1006, 2: 2012, 3: 4024 },
+}
+
+const totalSpecSum = computed(
+  () => specT4.value + specT5.value + specT6.value + specT7.value + specT8.value,
+)
+
+const specByTier = computed<Record<number, number>>(() => ({
+  4: specT4.value,
+  5: specT5.value,
+  6: specT6.value,
+  7: specT7.value,
+  8: specT8.value,
+}))
 
 function rrrKey(bonusCity: boolean, event: number, focus: boolean): string {
   return `${bonusCity ? 'bonus' : 'other'}_${event}_${focus ? 'focus' : 'nofocus'}`
@@ -294,16 +330,30 @@ const returnRatePct = computed(() => (returnRate.value * 100).toFixed(1))
 
 /** Base focus cost before spec reduction (Spec 0). */
 const focusCostBase = computed(() => {
-  const base = BASE_FOCUS[tier.value] ?? 0
-  if (base === 0) return 0
-  if (material.value === 'stone') return base * STONE_BASE_MULT
-  return base * (ENCHANT_FOCUS_MULT[enchantment.value] ?? 1)
+  const enc = material.value === 'stone' ? stoneEnchantment.value : enchantment.value
+  const table = material.value === 'stone' ? BASE_FOCUS_STONE : BASE_FOCUS_NORMAL
+  return table[tier.value]?.[enc] ?? 0
 })
 
-/** Focus cost per refine action after spec reduction. */
+/**
+ * Focus cost per refine action after spec reduction.
+ * T2/T3: fixed at baseCost (spec has no effect).
+ * T4+: FocusCost = baseCost × 0.5^((totalSpec×0.3 + specTx×2.5) / 100)
+ */
 const focusCostPerRefine = computed(() => {
   if (!useFocus.value || focusCostBase.value === 0) return 0
-  return Math.round(focusCostBase.value * (1 - specLevel.value * 0.005))
+  if (tier.value <= 3) return focusCostBase.value
+  const specTx = specByTier.value[tier.value] ?? 0
+  const exponent = (totalSpecSum.value * 0.3 + specTx * 2.5) / 100
+  return Math.round(focusCostBase.value * Math.pow(0.5, exponent))
+})
+
+/** Effective focus cost reduction % from spec for the current tier. */
+const focusSpecReductionPct = computed(() => {
+  if (tier.value <= 3) return 0
+  const specTx = specByTier.value[tier.value] ?? 0
+  const exponent = (totalSpecSum.value * 0.3 + specTx * 2.5) / 100
+  return (1 - Math.pow(0.5, exponent)) * 100
 })
 
 // Cost breakdown for 1 refined item produced (based on full-focus rate, for the detail table)
@@ -365,11 +415,14 @@ const totalFocus = computed(() => focusUsed.value)
 
 // Nutrition cost: ItemValue × 0.1125  →  cost = nutrition × stationFee / 100
 // Stone output is always base enchantment (.0); other materials use selected enchantment.
+// T2 has no nutrition cost.
 const itemValue = computed(() => {
   const enc = material.value === 'stone' ? 0 : enchantment.value
   return ITEM_VALUE_TABLE[tier.value]?.[enc] ?? 0
 })
-const nutritionPerAction = computed(() => itemValue.value * 0.1125)
+const nutritionPerAction = computed(() =>
+  tier.value <= 2 ? 0 : itemValue.value * 0.1125 * outputYield.value,
+)
 const nutritionCostPerAction = computed(() => (nutritionPerAction.value * stationFee.value) / 100)
 const totalNutritionCost = computed(() => nutritionCostPerAction.value * refineActions.value)
 const nutritionCostPerItem = computed(() =>
@@ -513,7 +566,7 @@ function marginBgClass(pct: number | null): string {
 
         <!-- Stone recipe variant selector: selects which raw stone enchantment to use -->
         <div v-if="hasStoneSubtier" class="mb-3">
-          <p class="text-xs text-gray-500 mb-1.5">Receita (enchantment da pedra)</p>
+          <p class="text-xs text-gray-500 mb-1.5">Receita (encantamento da pedra)</p>
           <div class="flex gap-2 flex-wrap">
             <button
               v-for="s in [0, 1, 2, 3]"
@@ -647,19 +700,65 @@ function marginBgClass(pct: number | null): string {
             <input type="checkbox" v-model="useFocus" class="accent-yellow-400" />
             <span class="text-sm">Usar foco no refino</span>
           </label>
-          <div v-if="useFocus" class="space-y-2">
-            <label class="text-xs text-gray-400 block">Especialização (0 – 100)</label>
-            <input
-              type="number"
-              v-model.number="specLevel"
-              min="0"
-              max="100"
-              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-            />
-            <p class="text-xs text-gray-500">
-              Redução no custo de foco: {{ (specLevel * 0.5).toFixed(1) }}% · custo =
-              {{ (1 - specLevel * 0.005).toFixed(3) }} × base — não afeta o retorno
+          <div v-if="useFocus" class="space-y-3">
+            <p class="text-xs text-gray-400">Especialização por Tier (0 – 100)</p>
+            <div class="grid grid-cols-5 gap-2">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500 text-center">T4</label>
+                <input
+                  type="number"
+                  v-model.number="specT4"
+                  min="0"
+                  max="100"
+                  class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-1 py-2 outline-none focus:ring-1 focus:ring-yellow-400 text-center"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500 text-center">T5</label>
+                <input
+                  type="number"
+                  v-model.number="specT5"
+                  min="0"
+                  max="100"
+                  class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-1 py-2 outline-none focus:ring-1 focus:ring-yellow-400 text-center"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500 text-center">T6</label>
+                <input
+                  type="number"
+                  v-model.number="specT6"
+                  min="0"
+                  max="100"
+                  class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-1 py-2 outline-none focus:ring-1 focus:ring-yellow-400 text-center"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500 text-center">T7</label>
+                <input
+                  type="number"
+                  v-model.number="specT7"
+                  min="0"
+                  max="100"
+                  class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-1 py-2 outline-none focus:ring-1 focus:ring-yellow-400 text-center"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="text-xs text-gray-500 text-center">T8</label>
+                <input
+                  type="number"
+                  v-model.number="specT8"
+                  min="0"
+                  max="100"
+                  class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-1 py-2 outline-none focus:ring-1 focus:ring-yellow-400 text-center"
+                />
+              </div>
+            </div>
+            <p v-if="tier >= 4" class="text-xs text-gray-500">
+              Redução no custo de foco: {{ focusSpecReductionPct.toFixed(1) }}% — não afeta o
+              retorno
             </p>
+            <p v-else class="text-xs text-gray-500">T2/T3: custo de foco fixo, spec não reduz.</p>
             <label class="text-xs text-gray-400 block mt-2">Foco disponível (máx. 30.000)</label>
             <input
               type="number"
@@ -704,13 +803,17 @@ function marginBgClass(pct: number | null): string {
         </h2>
         <div class="space-y-3">
           <div>
-            <label class="text-xs text-gray-400 mb-1 flex items-center gap-1.5">
-              Preço de
-              <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
-                rawBadge.label
-              }}</span>
-              {{ rawDisplayName }}
-            </label>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 mb-1 block">Preço de</label>
+              <div
+                class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
+              >
+                <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
+                  rawBadge.label
+                }}</span>
+                {{ rawDisplayName }}
+              </div>
+            </div>
             <input
               type="number"
               v-model.number="rawPrice"
@@ -720,13 +823,17 @@ function marginBgClass(pct: number | null): string {
             />
           </div>
           <div v-if="hasSubIngredient">
-            <label class="text-xs text-gray-400 mb-1 flex items-center gap-1.5">
-              Preço de
-              <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
-                subBadge.label
-              }}</span>
-              {{ subRefinedDisplayName }}
-            </label>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 mb-1 block">Preço de</label>
+              <div
+                class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
+              >
+                <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
+                  subBadge.label
+                }}</span>
+                {{ subRefinedDisplayName }}
+              </div>
+            </div>
             <input
               type="number"
               v-model.number="subPrice"
@@ -749,14 +856,18 @@ function marginBgClass(pct: number | null): string {
             <p class="text-xs text-gray-600 mt-1">Nutrição por refino: {{ nutritionPerAction }}</p>
           </div>
           <div>
-            <label class="text-xs text-gray-400 mb-1 flex items-center gap-1.5">
-              Preço de venda de
-              <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
-                refinedBadge.label
-              }}</span>
-              {{ refinedDisplayName }}
-              <span class="text-gray-600">(opcional)</span>
-            </label>
+            <div class="flex items-center gap-1">
+              <label class="text-xs text-gray-400 mb-1 block"> Preço de venda </label>
+              <div
+                class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
+              >
+                <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
+                  refinedBadge.label
+                }}</span>
+                {{ refinedDisplayName }}
+              </div>
+              <span class="text-gray-600 text-xs mb-1">(opcional)</span>
+            </div>
             <input
               type="number"
               v-model.number="sellPrice"
@@ -816,7 +927,7 @@ function marginBgClass(pct: number | null): string {
               v-if="hasBonusCity"
               class="bg-yellow-400/20 text-yellow-300 px-2 py-1 rounded-full border border-yellow-400/30"
             >
-              Bônus cidade (+0,40 eff.)
+              Bônus cidade
             </span>
             <span
               v-if="eventBonus > 0"
@@ -828,7 +939,7 @@ function marginBgClass(pct: number | null): string {
               v-if="useFocus"
               class="bg-blue-400/20 text-blue-300 px-2 py-1 rounded-full border border-blue-400/30"
             >
-              Foco · Spec {{ specLevel }}
+              Foco · −{{ focusSpecReductionPct.toFixed(1) }}%
             </span>
             <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded-full font-semibold">
               Retorno: {{ returnRatePct }} %
@@ -859,7 +970,7 @@ function marginBgClass(pct: number | null): string {
           <p v-if="isBudgetLimited" class="text-xs text-yellow-400 mt-1">média ponderada</p>
         </div>
         <div class="bg-gray-800 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Custo total (×{{ quantity }})</p>
+          <p class="text-xs text-gray-400 mb-1">Custo total ({{ quantity }}×)</p>
           <p class="text-2xl font-bold text-yellow-300">
             {{ fmt(totalCost + totalNutritionCost) }}
           </p>
@@ -975,7 +1086,7 @@ function marginBgClass(pct: number | null): string {
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-0.5">Redução pela spec</p>
-            <p class="text-blue-300 font-semibold">{{ (specLevel * 0.5).toFixed(1) }} %</p>
+            <p class="text-blue-300 font-semibold">{{ focusSpecReductionPct.toFixed(1) }} %</p>
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-0.5">Foco por refino</p>
@@ -1055,7 +1166,7 @@ function marginBgClass(pct: number | null): string {
             <p class="text-orange-400 font-bold">{{ fmt(nutritionCostPerItem) }}</p>
           </div>
           <div>
-            <p class="text-xs text-gray-500 mb-0.5">Custo total (×{{ quantity }})</p>
+            <p class="text-xs text-gray-500 mb-0.5">Custo total ({{ quantity }}×)</p>
             <p class="text-orange-400 font-bold">{{ fmt(totalNutritionCost) }}</p>
           </div>
         </div>
@@ -1072,7 +1183,7 @@ function marginBgClass(pct: number | null): string {
             <p class="text-xl font-bold text-gray-200">{{ fmt(sellPrice) }}</p>
           </div>
           <div class="bg-gray-800 rounded-xl p-3 text-center">
-            <p class="text-xs text-gray-400 mb-1">Custo de refino</p>
+            <p class="text-xs text-gray-400 mb-1">Custo de refino (1×)</p>
             <p class="text-xl font-bold text-yellow-300">
               {{ fmt(costPerItem + nutritionCostPerItem) }}
             </p>
@@ -1081,7 +1192,7 @@ function marginBgClass(pct: number | null): string {
             </p>
           </div>
           <div class="bg-gray-800 rounded-xl p-3 text-center">
-            <p class="text-xs text-gray-400 mb-1">Lucro por item</p>
+            <p class="text-xs text-gray-400 mb-1">Lucro por item (1×)</p>
             <p class="text-xl font-bold" :class="profitColorClass(profitPerItem)">
               {{ profitPerItem !== null ? fmt(profitPerItem) : '—' }}
             </p>

@@ -278,10 +278,11 @@ function dateBgClass(dateStr: string): string {
             :key="id"
             class="inline-flex items-center gap-1 bg-yellow-400/10 text-yellow-300 text-xs px-2 py-1 rounded-full border border-yellow-400/30"
           >
-            {{ itemName(id) }}
             <span :class="['text-xs font-bold px-1 rounded', tierBadge(id).classes]">
               {{ tierBadge(id).label }}
             </span>
+            {{ itemName(id) }}
+
             <button
               @click="removeItem(id)"
               class="hover:text-red-400 transition-colors leading-none cursor-pointer"

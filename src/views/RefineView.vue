@@ -1,476 +1,97 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { Location } from '@/types/items'
+import { useRefineCalculator } from '@/composables/useRefineCalculator'
+import {
+  MATERIAL_OPTIONS,
+  TIER_OPTIONS,
+  ALL_CITIES,
+  SUBTIER_COLORS,
+  fmt,
+  profitColorClass,
+  marginColorClass,
+  marginBgClass,
+} from '@/data/refineData'
 
-type MaterialType = 'wood' | 'hide' | 'ore' | 'stone' | 'fiber'
-
-const MATERIALS = {
-  wood: { label: 'Madeira' },
-  hide: { label: 'Pelego' },
-  ore: { label: 'Minério' },
-  stone: { label: 'Pedra' },
-  fiber: { label: 'Fibra' },
-} satisfies Record<MaterialType, { label: string }>
-
-const RAW_NAMES: Record<MaterialType, Record<number, string>> = {
-  wood: {
-    2: 'Troncos de Bétula',
-    3: 'Troncos de Castanheira',
-    4: 'Troncos de Pinho',
-    5: 'Troncos de Cedro',
-    6: 'Troncos de Carvalho-sangue',
-    7: 'Troncos de Freixo',
-    8: 'Troncos de Pau-branco',
-  },
-  hide: {
-    2: 'Pelego Rústico',
-    3: 'Pelego Fino',
-    4: 'Pelego Médio',
-    5: 'Pelego Pesado',
-    6: 'Pelego Robusto',
-    7: 'Pelego Grosso',
-    8: 'Pelego Resistente',
-  },
-  ore: {
-    2: 'Minério de Cobre',
-    3: 'Minério de Estanho',
-    4: 'Minério de Ferro',
-    5: 'Minério de Titânio',
-    6: 'Minério de Runita',
-    7: 'Minério de Meteorito',
-    8: 'Minério de Adamântio',
-  },
-  stone: {
-    2: 'Calcário',
-    3: 'Arenito',
-    4: 'Travertino',
-    5: 'Granito',
-    6: 'Ardósia',
-    7: 'Basalto',
-    8: 'Mármore',
-  },
-  fiber: {
-    2: 'Algodão',
-    3: 'Linho',
-    4: 'Cânhamo',
-    5: 'Verbena',
-    6: 'Algodão-vermelho',
-    7: 'Linhossol',
-    8: 'Cânhamo-fantasma',
-  },
-}
-
-const REFINED_NAMES: Record<MaterialType, Record<number, string>> = {
-  wood: {
-    2: 'Tábuas de Bétula',
-    3: 'Tábuas de Castanheira',
-    4: 'Tábuas de Pinho',
-    5: 'Tábuas de Cedro',
-    6: 'Tábuas de Carvalho-sangue',
-    7: 'Tábuas de Freixo',
-    8: 'Tábuas de Pau-branco',
-  },
-  hide: {
-    2: 'Couro Esticado',
-    3: 'Couro Grosso',
-    4: 'Couro Trabalhado',
-    5: 'Couro Curtido',
-    6: 'Couro Endurecido',
-    7: 'Couro Reforçado',
-    8: 'Couro Fortificado',
-  },
-  ore: {
-    2: 'Barra de Cobre',
-    3: 'Barra de Bronze',
-    4: 'Barra de Aço',
-    5: 'Barra de Aço Titânio',
-    6: 'Barra de Aço Runita',
-    7: 'Barra de Aço Meteorito',
-    8: 'Barra de Aço Adamântio',
-  },
-  stone: {
-    2: 'Bloco de Calcário',
-    3: 'Bloco de Arenito',
-    4: 'Bloco de Travertino',
-    5: 'Bloco de Granito',
-    6: 'Bloco de Ardósia',
-    7: 'Bloco de Basalto',
-    8: 'Bloco de Mármore',
-  },
-  fiber: {
-    2: 'Tecido Simples',
-    3: 'Tecido Limpo',
-    4: 'Tecido Fino',
-    5: 'Tecido Ornado',
-    6: 'Tecido Rico',
-    7: 'Tecido Opulento',
-    8: 'Tecido Barroco',
-  },
-}
-
-// Base return rate: 15.2% in any city; 36.7% in the bonus city for that material
-const CITY_BONUS: Record<MaterialType, Location> = {
-  wood: Location.FortSterling,
-  hide: Location.Martlock,
-  ore: Location.Thetford,
-  stone: Location.Bridgewatch,
-  fiber: Location.Lymhurst,
-}
-
-// Number of raw resources required per refine action, by tier
-const RAW_QTY: Record<number, number> = {
-  2: 1,
-  3: 2,
-  4: 2,
-  5: 3,
-  6: 4,
-  7: 5,
-  8: 5,
-}
-
-// Item Value (IV) lookup table — used for focus cost and nutrition calculation.
-// Stone output is always base (.0); enchantment only applies to non-stone output.
-const ITEM_VALUE_TABLE: Record<number, Record<number, number>> = {
-  2: { 0: 4 },
-  3: { 0: 8 },
-  4: { 0: 16, 1: 32, 2: 64, 3: 128, 4: 256 },
-  5: { 0: 32, 1: 64, 2: 128, 3: 256, 4: 512 },
-  6: { 0: 64, 1: 128, 2: 256, 3: 512, 4: 1024 },
-  7: { 0: 128, 1: 256, 2: 512, 3: 1024, 4: 2048 },
-  8: { 0: 256, 1: 512, 2: 1024, 3: 2048, 4: 4096 },
-}
-
-// Fixed return rates (%) per scenario — sourced directly from in-game observations.
-// key: `${bonusCity ? 'bonus' : 'other'}_${eventBonus}_${focus ? 'focus' : 'nofocus'}`
-const RRR_TABLE: Record<string, number> = {
-  other_0_nofocus: 0.152,
-  other_10_nofocus: 0.218,
-  other_20_nofocus: 0.269,
-  other_0_focus: 0.435,
-  other_10_focus: 0.465,
-  other_20_focus: 0.495,
-  bonus_0_nofocus: 0.367,
-  bonus_10_nofocus: 0.404,
-  bonus_20_nofocus: 0.438,
-  bonus_0_focus: 0.539,
-  bonus_10_focus: 0.559,
-  bonus_20_focus: 0.578,
-}
-
-const MATERIAL_OPTIONS: { value: MaterialType; label: string; recipe: string }[] = [
-  { value: 'wood', label: 'Madeira', recipe: 'Tronco → Tábua' },
-  { value: 'hide', label: 'Pelego', recipe: 'Pelego → Couro' },
-  { value: 'ore', label: 'Minério', recipe: 'Minério → Barra' },
-  { value: 'stone', label: 'Pedra', recipe: 'Pedra → Bloco' },
-  { value: 'fiber', label: 'Fibra', recipe: 'Fibra → Tecido' },
-]
-
-const TIER_OPTIONS = [2, 3, 4, 5, 6, 7, 8]
-
-const ALL_CITIES = Object.values(Location)
-
-// ── State ──────────────────────────────────────────────────────────────────
-const material = ref<MaterialType>('wood')
-const tier = ref(5)
-const enchantment = ref(0)
-const stoneEnchantment = ref(0)
-const city = ref<Location>(Location.FortSterling)
-const eventBonus = ref(0)
-const useFocus = ref(false)
-const specT4 = ref(0)
-const specT5 = ref(0)
-const specT6 = ref(0)
-const specT7 = ref(0)
-const specT8 = ref(0)
-const focusBudget = ref(30000)
-
-watch(focusBudget, (v) => {
-  if (v > 30000) focusBudget.value = 30000
-  if (v < 0) focusBudget.value = 0
-})
-const rawPrice = ref(0)
-const subPrice = ref(0)
-const quantity = ref(1)
-const sellPrice = ref(0)
-const stationFee = ref(0) // prata por 100 de nutrição
-
-// ── Derived values ─────────────────────────────────────────────────────────
-// Reset subtiers on material/tier change
-watch(material, (m) => {
-  if (m === 'stone') enchantment.value = 0
-  else stoneEnchantment.value = 0
-  city.value = CITY_BONUS[m]
-})
-watch(tier, (t) => {
-  if (t < 4) {
-    enchantment.value = 0
-    stoneEnchantment.value = 0
-  }
-})
-
-// Non-stone subtiers only from T4 upward
-const hasSubtiers = computed(() => material.value !== 'stone' && tier.value >= 4)
-// Stone recipe variants: raw stone has enchantment .0–.3 for T4+; output block never has enchantment
-const hasStoneSubtier = computed(() => material.value === 'stone' && tier.value >= 4)
-
-// Sub-ingredient quantity: 2^stoneEnchantment for stone T4+, otherwise 1 (or 0 for T2)
-const subQty = computed(() => {
-  if (!hasSubIngredient.value) return 0
-  if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneEnchantment.value)
-  return 1
-})
-// Output yield per refine action: 2^stoneEnchantment for stone T4+, otherwise always 1
-const outputYield = computed(() => {
-  if (material.value === 'stone' && tier.value >= 4) return Math.pow(2, stoneEnchantment.value)
-  return 1
-})
-
-const SUBTIER_COLORS: Record<number, string> = {
-  0: 'bg-gray-600 text-gray-100',
-  1: 'bg-green-700 text-green-100',
-  2: 'bg-blue-700 text-blue-100',
-  3: 'bg-purple-700 text-purple-100',
-  4: 'bg-yellow-600 text-yellow-100',
-}
-
-function tierLabel(t: number, s: number = 0): string {
-  return s > 0 ? `T${t}.${s}` : `T${t}`
-}
-
-function tierBadge(t: number, s: number = 0): { label: string; classes: string } {
-  return { label: tierLabel(t, s), classes: SUBTIER_COLORS[s] ?? 'bg-gray-600 text-gray-100' }
-}
-
-const bonusCity = computed(() => CITY_BONUS[material.value])
-const hasBonusCity = computed(() => city.value === bonusCity.value)
-const rawQty = computed(() => RAW_QTY[tier.value])
-const hasSubIngredient = computed(() => tier.value > 2)
-const mat = computed(() => MATERIALS[material.value])
-
-// Tier-specific resource names
-const rawName = computed(() => RAW_NAMES[material.value][tier.value] ?? '')
-const refinedName = computed(() => REFINED_NAMES[material.value][tier.value] ?? '')
-const subRefinedName = computed(() => REFINED_NAMES[material.value][tier.value - 1] ?? '')
-
-const ENCHANTMENT_SUFFIX: Record<number, string> = {
-  0: '',
-  1: ' Incomum',
-  2: ' Raro',
-  3: ' Excepcional',
-  4: ' Lendário',
-}
-
-// Full display names including enchantment suffix
-const rawDisplayName = computed(() => {
-  const enc = material.value === 'stone' ? stoneEnchantment.value : enchantment.value
-  return rawName.value + (ENCHANTMENT_SUFFIX[enc] ?? '')
-})
-const refinedDisplayName = computed(
-  () => refinedName.value + (ENCHANTMENT_SUFFIX[enchantment.value] ?? ''),
-)
-const subRefinedDisplayName = computed(() => {
-  const enc = tier.value > 4 ? enchantment.value : 0
-  return subRefinedName.value + (ENCHANTMENT_SUFFIX[enc] ?? '')
-})
-// Badge for the raw input (stone uses stoneEnchantment, others use enchantment)
-const rawBadge = computed(() =>
-  tierBadge(tier.value, material.value === 'stone' ? stoneEnchantment.value : enchantment.value),
-)
-const subBadge = computed(() => tierBadge(tier.value - 1, tier.value > 4 ? enchantment.value : 0))
-const refinedBadge = computed(() => tierBadge(tier.value, enchantment.value))
-
-// Base focus cost lookup tables (Spec 0), by tier and enchantment
-const BASE_FOCUS_NORMAL: Record<number, Record<number, number>> = {
-  2: { 0: 18 },
-  3: { 0: 31 },
-  4: { 0: 54, 1: 94, 2: 164, 3: 287, 4: 503 },
-  5: { 0: 94, 1: 164, 2: 287, 3: 503, 4: 880 },
-  6: { 0: 164, 1: 287, 2: 503, 3: 880, 4: 1539 },
-  7: { 0: 287, 1: 503, 2: 880, 3: 1539, 4: 2694 },
-  8: { 0: 503, 1: 880, 2: 1539, 3: 2694, 4: 4714 },
-}
-
-const BASE_FOCUS_STONE: Record<number, Record<number, number>> = {
-  2: { 0: 18 },
-  3: { 0: 31 },
-  4: { 0: 54, 1: 108, 2: 216, 3: 432 },
-  5: { 0: 94, 1: 188, 2: 376, 3: 752 },
-  6: { 0: 164, 1: 328, 2: 656, 3: 1312 },
-  7: { 0: 287, 1: 574, 2: 1148, 3: 2296 },
-  8: { 0: 503, 1: 1006, 2: 2012, 3: 4024 },
-}
-
-const totalSpecSum = computed(
-  () => specT4.value + specT5.value + specT6.value + specT7.value + specT8.value,
-)
-
-const specByTier = computed<Record<number, number>>(() => ({
-  4: specT4.value,
-  5: specT5.value,
-  6: specT6.value,
-  7: specT7.value,
-  8: specT8.value,
-}))
-
-function rrrKey(bonusCity: boolean, event: number, focus: boolean): string {
-  return `${bonusCity ? 'bonus' : 'other'}_${event}_${focus ? 'focus' : 'nofocus'}`
-}
-
-// Return rate without focus (used for the no-focus portion of a budget-limited run)
-const returnRateNoFocus = computed(
-  () => RRR_TABLE[rrrKey(hasBonusCity.value, eventBonus.value, false)] ?? 0.152,
-)
-
-// Return rate for the active configuration
-const returnRate = computed(
-  () => RRR_TABLE[rrrKey(hasBonusCity.value, eventBonus.value, useFocus.value)] ?? 0.152,
-)
-
-const returnRatePct = computed(() => (returnRate.value * 100).toFixed(1))
-
-/** Base focus cost before spec reduction (Spec 0). */
-const focusCostBase = computed(() => {
-  const enc = material.value === 'stone' ? stoneEnchantment.value : enchantment.value
-  const table = material.value === 'stone' ? BASE_FOCUS_STONE : BASE_FOCUS_NORMAL
-  return table[tier.value]?.[enc] ?? 0
-})
-
-/**
- * Focus cost per refine action after spec reduction.
- * T2/T3: fixed at baseCost (spec has no effect).
- * T4+: FocusCost = baseCost × 0.5^((totalSpec×0.3 + specTx×2.5) / 100)
- */
-const focusCostPerRefine = computed(() => {
-  if (!useFocus.value || focusCostBase.value === 0) return 0
-  if (tier.value <= 3) return focusCostBase.value
-  const specTx = specByTier.value[tier.value] ?? 0
-  const exponent = (totalSpecSum.value * 0.3 + specTx * 2.5) / 100
-  return Math.round(focusCostBase.value * Math.pow(0.5, exponent))
-})
-
-/** Effective focus cost reduction % from spec for the current tier. */
-const focusSpecReductionPct = computed(() => {
-  if (tier.value <= 3) return 0
-  const specTx = specByTier.value[tier.value] ?? 0
-  const exponent = (totalSpecSum.value * 0.3 + specTx * 2.5) / 100
-  return (1 - Math.pow(0.5, exponent)) * 100
-})
-
-// Cost breakdown for 1 refined item produced (based on full-focus rate, for the detail table)
-const rawGross = computed(() => (rawQty.value ?? 0) * rawPrice.value)
-const subGross = computed(() => subQty.value * subPrice.value)
-const totalGross = computed(() => rawGross.value + subGross.value)
-const rawReturn = computed(() => rawGross.value * returnRate.value)
-const subReturn = computed(() => subGross.value * returnRate.value)
-const totalReturn = computed(() => totalGross.value * returnRate.value)
-
-// Scaled values for the full quantity requested
-const rawQtyTotal = computed(() => (rawQty.value ?? 0) * refineActions.value)
-const subQtyTotal = computed(() => subQty.value * refineActions.value)
-const rawGrossTotal = computed(() => rawGross.value * refineActions.value)
-const subGrossTotal = computed(() => subGross.value * refineActions.value)
-const totalGrossTotal = computed(() => totalGross.value * refineActions.value)
-const rawReturnTotal = computed(() => rawReturn.value * refineActions.value)
-const subReturnTotal = computed(() => subReturn.value * refineActions.value)
-const totalReturnTotal = computed(() => totalReturn.value * refineActions.value)
-
-// Scaled by quantity
-// Refine actions needed (one action can yield multiple items for stone with enchantment)
-const refineActions = computed(() => Math.ceil(quantity.value / outputYield.value))
-
-// Focus budget split
-const actionsWithFocus = computed(() => {
-  if (!useFocus.value || focusCostPerRefine.value === 0) return 0
-  return Math.min(refineActions.value, Math.floor(focusBudget.value / focusCostPerRefine.value))
-})
-const actionsWithoutFocus = computed(() => refineActions.value - actionsWithFocus.value)
-const focusUsed = computed(() => actionsWithFocus.value * focusCostPerRefine.value)
-const isBudgetLimited = computed(
-  () => useFocus.value && focusCostPerRefine.value > 0 && actionsWithoutFocus.value > 0,
-)
-
-// Cost per item for each segment
-const costPerItemWithFocus = computed(
-  () => (totalGross.value * (1 - returnRate.value)) / outputYield.value,
-)
-const costPerItemNoFocus = computed(
-  () => (totalGross.value * (1 - returnRateNoFocus.value)) / outputYield.value,
-)
-
-// Blended cost per item (weighted average over all output items)
-const itemsWithFocus = computed(() => actionsWithFocus.value * outputYield.value)
-const itemsWithoutFocus = computed(() => actionsWithoutFocus.value * outputYield.value)
-const costPerItem = computed(() => {
-  if (!useFocus.value) return costPerItemNoFocus.value
-  if (quantity.value === 0) return 0
-  return (
-    (costPerItemWithFocus.value * itemsWithFocus.value +
-      costPerItemNoFocus.value * itemsWithoutFocus.value) /
-    quantity.value
-  )
-})
-
-const totalCost = computed(() => costPerItem.value * quantity.value)
-const totalFocus = computed(() => focusUsed.value)
-
-// Nutrition cost: ItemValue × 0.1125  →  cost = nutrition × stationFee / 100
-// Stone output is always base enchantment (.0); other materials use selected enchantment.
-// T2 has no nutrition cost.
-const itemValue = computed(() => {
-  const enc = material.value === 'stone' ? 0 : enchantment.value
-  return ITEM_VALUE_TABLE[tier.value]?.[enc] ?? 0
-})
-const nutritionPerAction = computed(() =>
-  tier.value <= 2 ? 0 : itemValue.value * 0.1125 * outputYield.value,
-)
-const nutritionCostPerAction = computed(() => (nutritionPerAction.value * stationFee.value) / 100)
-const totalNutritionCost = computed(() => nutritionCostPerAction.value * refineActions.value)
-const nutritionCostPerItem = computed(() =>
-  quantity.value > 0 ? totalNutritionCost.value / quantity.value : 0,
-)
-
-// Optional profit estimate (only when a sell price is provided)
-// Profit uses the blended costPerItem (already accounts for partial focus)
-const profitPerItem = computed(() =>
-  sellPrice.value > 0 ? sellPrice.value - costPerItem.value - nutritionCostPerItem.value : null,
-)
-const totalProfit = computed(() =>
-  profitPerItem.value !== null ? profitPerItem.value * quantity.value : null,
-)
-
-// Profit margin % = profitPerItem / totalNetCostPerItem
-// Total net cost = what you actually spend after material returns + nutrition
-const profitMarginPct = computed(() => {
-  if (profitPerItem.value === null) return null
-  const netCost = costPerItem.value + nutritionCostPerItem.value
-  if (netCost === 0) return null
-  return (profitPerItem.value / netCost) * 100
-})
-
-function fmt(n: number) {
-  return n.toLocaleString('pt-BR', { maximumFractionDigits: 0 })
-}
-
-function profitColorClass(n: number | null) {
-  if (n === null) return 'text-gray-400'
-  return n >= 0 ? 'text-green-400' : 'text-red-400'
-}
-
-function marginColorClass(pct: number | null): string {
-  if (pct === null) return 'text-gray-400'
-  if (pct < 0) return 'text-red-400'
-  if (pct < 10) return 'text-yellow-400'
-  if (pct < 20) return 'text-green-400'
-  return 'text-blue-400'
-}
-
-function marginBgClass(pct: number | null): string {
-  if (pct === null) return 'bg-gray-800'
-  if (pct < 0) return 'bg-red-900/30 border border-red-700/40'
-  if (pct < 10) return 'bg-yellow-900/30 border border-yellow-700/40'
-  if (pct < 20) return 'bg-green-900/30 border border-green-700/40'
-  return 'bg-blue-900/30 border border-blue-700/40'
-}
+const {
+  // State
+  material,
+  tier,
+  enchantment,
+  stoneEnchantment,
+  city,
+  eventBonus,
+  useFocus,
+  specT4,
+  specT5,
+  specT6,
+  specT7,
+  specT8,
+  focusBudget,
+  rawPrice,
+  subPrice,
+  quantity,
+  sellPrice,
+  stationFee,
+  // Recipe
+  hasSubtiers,
+  hasStoneSubtier,
+  hasSubIngredient,
+  subQty,
+  outputYield,
+  rawQty,
+  bonusCity,
+  hasBonusCity,
+  mat,
+  // Display
+  rawDisplayName,
+  refinedDisplayName,
+  subRefinedDisplayName,
+  rawBadge,
+  subBadge,
+  refinedBadge,
+  // Focus
+  focusCostBase,
+  focusCostPerRefine,
+  focusSpecReductionPct,
+  // Rates
+  returnRate,
+  returnRateNoFocus,
+  returnRatePct,
+  // Cost per action
+  rawGross,
+  subGross,
+  totalGross,
+  rawReturn,
+  subReturn,
+  totalReturn,
+  refineActions,
+  // Scaled totals
+  rawQtyTotal,
+  subQtyTotal,
+  rawGrossTotal,
+  subGrossTotal,
+  totalGrossTotal,
+  rawReturnTotal,
+  subReturnTotal,
+  totalReturnTotal,
+  // Focus split
+  actionsWithFocus,
+  actionsWithoutFocus,
+  focusUsed,
+  isBudgetLimited,
+  costPerItemWithFocus,
+  costPerItemNoFocus,
+  costPerItem,
+  totalCost,
+  totalFocus,
+  // Nutrition
+  nutritionPerAction,
+  nutritionCostPerItem,
+  totalNutritionCost,
+  // Profit
+  profitPerItem,
+  totalProfit,
+  profitMarginPct,
+} = useRefineCalculator()
 </script>
 
 <template>
@@ -954,7 +575,7 @@ function marginBgClass(pct: number | null): string {
       <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados do Cálculo</h2>
 
       <!-- KPI cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="bg-gray-800 rounded-xl p-4 text-center">
           <p class="text-xs text-gray-400 mb-1">Taxa de retorno</p>
           <p
@@ -970,7 +591,16 @@ function marginBgClass(pct: number | null): string {
           <p v-if="isBudgetLimited" class="text-xs text-yellow-400 mt-1">média ponderada</p>
         </div>
         <div class="bg-gray-800 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Custo total ({{ quantity }}×)</p>
+          <p class="text-xs text-gray-400 mb-1">Custo total bruto ({{ quantity }}×)</p>
+          <p class="text-2xl font-bold text-yellow-300">
+            {{ fmt(totalGrossTotal + totalNutritionCost) }}
+          </p>
+          <p v-if="stationFee > 0" class="text-xs text-orange-400 mt-1">
+            {{ fmt(totalGrossTotal) }} materiais + {{ fmt(totalNutritionCost) }} nutrição
+          </p>
+        </div>
+        <div class="bg-gray-800 rounded-xl p-4 text-center">
+          <p class="text-xs text-gray-400 mb-1">Custo total líquido ({{ quantity }}×)</p>
           <p class="text-2xl font-bold text-yellow-300">
             {{ fmt(totalCost + totalNutritionCost) }}
           </p>
@@ -1183,7 +813,7 @@ function marginBgClass(pct: number | null): string {
             <p class="text-xl font-bold text-gray-200">{{ fmt(sellPrice) }}</p>
           </div>
           <div class="bg-gray-800 rounded-xl p-3 text-center">
-            <p class="text-xs text-gray-400 mb-1">Custo de refino (1×)</p>
+            <p class="text-xs text-gray-400 mb-1">Custo líquido de refino (1×)</p>
             <p class="text-xl font-bold text-yellow-300">
               {{ fmt(costPerItem + nutritionCostPerItem) }}
             </p>
@@ -1198,7 +828,7 @@ function marginBgClass(pct: number | null): string {
             </p>
           </div>
           <div class="bg-gray-800 rounded-xl p-3 text-center">
-            <p class="text-xs text-gray-400 mb-1">Lucro total (×{{ quantity }})</p>
+            <p class="text-xs text-gray-400 mb-1">Lucro total ({{ quantity }}×)</p>
             <p class="text-xl font-bold" :class="profitColorClass(totalProfit)">
               {{ totalProfit !== null ? fmt(totalProfit) : '—' }}
             </p>

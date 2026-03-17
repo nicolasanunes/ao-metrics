@@ -7,6 +7,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // server: {
+  //   host: '192.168.10.15',
+  // },
   plugins: [vue(), vueDevTools(), tailwindcss()],
   resolve: {
     alias: {

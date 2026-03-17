@@ -13,6 +13,16 @@ const router = createRouter({
       name: 'refine',
       component: () => import('../views/RefineView.vue'),
     },
+    {
+      path: '/island-farm',
+      name: 'island-farm',
+      component: () => import('../views/IslandFarmView.vue'),
+    },
+    {
+      path: '/island-pasture',
+      name: 'island-pasture',
+      component: () => import('../views/IslandPastureView.vue'),
+    },
   ],
 })
 

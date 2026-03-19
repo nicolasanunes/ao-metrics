@@ -19,6 +19,11 @@ const router = createRouter({
       component: () => import('../views/IslandFarmView.vue'),
     },
     {
+      path: '/island-herb-garden',
+      name: 'island-herb-garden',
+      component: () => import('../views/IslandHerbGardenView.vue'),
+    },
+    {
       path: '/island-pasture',
       name: 'island-pasture',
       component: () => import('../views/IslandPastureView.vue'),

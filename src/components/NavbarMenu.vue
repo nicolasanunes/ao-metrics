@@ -62,6 +62,13 @@ const isIslandActive = () => route.path.startsWith('/island')
             Fazendas
           </RouterLink>
           <RouterLink
+            to="/island-herb-garden"
+            class="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 whitespace-nowrap"
+            active-class="!bg-yellow-400 !text-gray-950"
+          >
+            Hortas
+          </RouterLink>
+          <RouterLink
             to="/island-pasture"
             class="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 whitespace-nowrap"
             active-class="!bg-yellow-400 !text-gray-950"

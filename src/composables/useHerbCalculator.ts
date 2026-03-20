@@ -92,13 +92,12 @@ export const HERB_OPTIONS: Array<{ value: HerbKey; label: string; tier: number }
   { value: 'milefolio', label: 'Milefólio-carniçal', tier: 8 },
 ]
 
-const SEEDS_PER_PLOT = 9
-
 // ── Composable ────────────────────────────────────────────────────────────
 
 export function useHerbCalculator() {
   // ── State ──────────────────────────────────────────────────────────────
 
+  const seedsPerPlot = ref(9)
   const herb = ref<HerbKey>('confrei')
   const specFarming = ref(100) // 0–100
   const specCultura = ref(0) // 0–100
@@ -113,15 +112,22 @@ export function useHerbCalculator() {
 
   // Clamp seedsWatered when plots changes
   watch(plots, (newPlots) => {
-    const max = newPlots * SEEDS_PER_PLOT
+    const max = newPlots * seedsPerPlot.value
     if (seedsWatered.value > max) seedsWatered.value = max
     if (newPlots < 1) plots.value = 1
   })
 
   watch(seedsWatered, (v) => {
-    const max = plots.value * SEEDS_PER_PLOT
+    const max = plots.value * seedsPerPlot.value
     if (v > max) seedsWatered.value = max
     if (v < 0) seedsWatered.value = 0
+  })
+
+  watch(seedsPerPlot, (v) => {
+    if (v > 9) seedsPerPlot.value = 9
+    if (v < 1) seedsPerPlot.value = 1
+    const max = plots.value * seedsPerPlot.value
+    if (seedsWatered.value > max) seedsWatered.value = max
   })
 
   watch(specFarming, (v) => {
@@ -146,8 +152,8 @@ export function useHerbCalculator() {
   const seedsWateredPerPlot = computed(() =>
     plots.value > 0 ? seedsWatered.value / plots.value : 0,
   )
-  const seedsUnwatered = computed(() => SEEDS_PER_PLOT * plots.value - seedsWatered.value)
-  const seedsUnwateredPerPlot = computed(() => SEEDS_PER_PLOT - seedsWateredPerPlot.value)
+  const seedsUnwatered = computed(() => seedsPerPlot.value * plots.value - seedsWatered.value)
+  const seedsUnwateredPerPlot = computed(() => seedsPerPlot.value - seedsWateredPerPlot.value)
   const herbYieldAvg = computed(() => (premium.value ? 9 : 4.5))
   const cityMult = computed(() => (cityBonus.value ? 1.1 : 1.0))
   const earthwormDrops = computed(() => (premium.value ? 2 : 1))
@@ -159,10 +165,10 @@ export function useHerbCalculator() {
       seedsUnwateredPerPlot.value * herbData.value.yieldUnwatered,
   )
 
-  const herbsHarvested = computed(() => SEEDS_PER_PLOT * herbYieldAvg.value * cityMult.value)
-  const earthworms = computed(() => SEEDS_PER_PLOT * 0.1 * earthwormDrops.value)
+  const herbsHarvested = computed(() => seedsPerPlot.value * herbYieldAvg.value * cityMult.value)
+  const earthworms = computed(() => seedsPerPlot.value * 0.1 * earthwormDrops.value)
   const focusThisCycle = computed(() => seedsWateredPerPlot.value * focusPerSeed.value)
-  const totalFame = computed(() => SEEDS_PER_PLOT * famePerHarvest.value)
+  const totalFame = computed(() => seedsPerPlot.value * famePerHarvest.value)
 
   // ── Per-plot financials ────────────────────────────────────────────────
 
@@ -173,7 +179,7 @@ export function useHerbCalculator() {
       earthworms.value * priceEarthworm.value,
   )
 
-  const cost = computed(() => SEEDS_PER_PLOT * priceSeed.value)
+  const cost = computed(() => seedsPerPlot.value * priceSeed.value)
   const netProfit = computed(() => revenue.value - cost.value)
 
   // ── Scaled by number of plots ──────────────────────────────────────────
@@ -195,13 +201,14 @@ export function useHerbCalculator() {
 
   // ── Seed sustainability indicator ──────────────────────────────────────
 
-  const isSeedSustainable = computed(() => seedsBack.value >= SEEDS_PER_PLOT)
+  const isSeedSustainable = computed(() => seedsBack.value >= seedsPerPlot.value)
 
   const bonusCities = computed(() => HERB_CITY_BONUS[herb.value])
 
   return {
     // state
     herb,
+    seedsPerPlot,
     specFarming,
     specCultura,
     seedsWatered,

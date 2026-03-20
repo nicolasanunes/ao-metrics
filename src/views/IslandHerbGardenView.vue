@@ -2,7 +2,8 @@
 import { useHerbCalculator } from '@/composables/useHerbCalculator'
 import { HERB_OPTIONS } from '@/composables/useHerbCalculator'
 import {
-  TIER_BADGE_CLASSES,
+  tierBg,
+  tierTextColor,
   fmt,
   profitColorClass,
   marginColorClass,
@@ -12,6 +13,7 @@ import {
 const {
   // State
   herb,
+  seedsPerPlot,
   specFarming,
   specCultura,
   seedsWatered,
@@ -126,7 +128,7 @@ const {
 
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="flex flex-col gap-1">
-            <label class="text-xs text-gray-500">Spec. em Herborista (0–100)</label>
+            <label class="text-xs text-gray-500">Especialização em Herborista (0–100)</label>
             <input
               type="number"
               v-model.number="specFarming"
@@ -136,7 +138,9 @@ const {
             />
           </div>
           <div class="flex flex-col gap-1">
-            <label class="text-xs text-gray-500">Spec. em {{ herbData.name }} (0–100)</label>
+            <label class="text-xs text-gray-500"
+              >Especialização em {{ herbData.name }} (0–100)</label
+            >
             <input
               type="number"
               v-model.number="specCultura"
@@ -222,25 +226,38 @@ const {
           Hortas &amp; Irrigação
         </h2>
 
-        <div class="mb-4">
-          <label class="text-xs text-gray-500 mb-2 block">Número de hortas</label>
-          <input
-            type="number"
-            v-model.number="plots"
-            min="1"
-            class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-          />
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="text-xs text-gray-500 mb-2 block">Número de hortas</label>
+            <input
+              type="number"
+              v-model.number="plots"
+              min="1"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
+          </div>
+
+          <div>
+            <label class="text-xs text-gray-500 mb-2 block">Ervas / horta (máx. 9)</label>
+            <input
+              type="number"
+              v-model.number="seedsPerPlot"
+              min="1"
+              max="9"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
+          </div>
         </div>
 
         <div class="border-t border-gray-700 pt-4 mb-4">
           <label class="text-xs text-gray-500 mb-2 block"
-            >Total de sementes irrigadas (máx. {{ 9 * plots }})</label
+            >Total de sementes irrigadas (máx. {{ seedsPerPlot * plots }})</label
           >
           <input
             type="number"
             v-model.number="seedsWatered"
             min="0"
-            :max="9 * plots"
+            :max="seedsPerPlot * plots"
             class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
           />
           <div class="flex items-center justify-between text-xs text-gray-500 mt-1.5">
@@ -255,11 +272,15 @@ const {
           <div class="space-y-1 text-xs">
             <div class="flex justify-between">
               <span class="text-gray-500">Sementes plantadas</span>
-              <span class="text-gray-300 font-semibold">9 × {{ plots }} = {{ 9 * plots }}</span>
+              <span class="text-gray-300 font-semibold"
+                >{{ seedsPerPlot }} × {{ plots }} = {{ seedsPerPlot * plots }}</span
+              >
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Colheita esperada / horta</span>
-              <span class="text-gray-300 font-semibold">~{{ herbYieldAvg.toFixed(1) }} × 9</span>
+              <span class="text-gray-300 font-semibold"
+                >~{{ herbYieldAvg.toFixed(1) }} × {{ seedsPerPlot }}</span
+              >
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Tempo de crescimento</span>
@@ -304,10 +325,8 @@ const {
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded',
-                    TIER_BADGE_CLASSES[herbData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded', tierBg(herbData.tier)]"
+                  :style="{ color: tierTextColor(herbData.tier) }"
                 >
                   T{{ herbData.tier }}
                 </span>
@@ -329,10 +348,8 @@ const {
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded',
-                    TIER_BADGE_CLASSES[herbData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded', tierBg(herbData.tier)]"
+                  :style="{ color: tierTextColor(herbData.tier) }"
                 >
                   T{{ herbData.tier }}
                 </span>
@@ -353,7 +370,7 @@ const {
               <div
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
-                <span class="text-xs font-bold px-1 rounded bg-gray-600 text-gray-100">T1</span>
+                <span class="text-xs font-bold px-1 rounded bg-[#707070] text-white">T1</span>
                 Minhoca
               </div>
               <span class="text-gray-600 text-xs mb-1">(opcional)</span>
@@ -436,10 +453,8 @@ const {
                   class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
                 >
                   <span
-                    :class="[
-                      'text-xs font-bold px-1 rounded',
-                      TIER_BADGE_CLASSES[herbData.tier] ?? 'bg-gray-600 text-gray-100',
-                    ]"
+                    :class="['text-xs font-bold px-1 rounded', tierBg(herbData.tier)]"
+                    :style="{ color: tierTextColor(herbData.tier) }"
                   >
                     T{{ herbData.tier }}
                   </span>
@@ -455,10 +470,8 @@ const {
                   class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
                 >
                   <span
-                    :class="[
-                      'text-xs font-bold px-1 rounded',
-                      TIER_BADGE_CLASSES[herbData.tier] ?? 'bg-gray-600 text-gray-100',
-                    ]"
+                    :class="['text-xs font-bold px-1 rounded', tierBg(herbData.tier)]"
+                    :style="{ color: tierTextColor(herbData.tier) }"
                   >
                     T{{ herbData.tier }}
                   </span>
@@ -475,7 +488,7 @@ const {
                 <div
                   class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
                 >
-                  <span class="text-xs font-bold px-1 rounded bg-gray-600 text-gray-100">T1</span>
+                  <span class="text-xs font-bold px-1 rounded bg-[#707070] text-white">T1</span>
                   Minhoca
                 </div>
               </div>
@@ -540,11 +553,11 @@ const {
       <!-- Multi-plot cards (visible when plots > 1) -->
       <div v-if="plots > 1" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="bg-blue-900/20 border border-blue-700/40 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Receita total ({{ plots }} jardins)</p>
+          <p class="text-xs text-gray-400 mb-1">Receita total / {{ plots }} jardins</p>
           <p class="text-xl font-bold text-yellow-300">{{ fmt(revenueTotal) }}</p>
         </div>
         <div class="bg-red-900/20 border border-red-700/40 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Custo total ({{ plots }} jardins)</p>
+          <p class="text-xs text-gray-400 mb-1">Custo total / {{ plots }} jardins</p>
           <p class="text-xl font-bold text-red-400">{{ fmt(costTotal) }}</p>
         </div>
         <div
@@ -574,7 +587,7 @@ const {
               : 'bg-red-900/20 border-red-700/40',
           ]"
         >
-          <p class="text-xs text-gray-400 mb-1">Sementes retornadas ({{ plots }} jardins)</p>
+          <p class="text-xs text-gray-400 mb-1">Sementes retornadas / {{ plots }} jardins</p>
           <p
             class="text-xl font-bold"
             :class="isSeedSustainable ? 'text-green-400' : 'text-red-400'"
@@ -608,10 +621,8 @@ const {
             <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
               <td class="px-3 py-2 text-yellow-300">
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded mr-1',
-                    TIER_BADGE_CLASSES[herbData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded mr-1', tierBg(herbData.tier)]"
+                  :style="{ color: tierTextColor(herbData.tier) }"
                 >
                   T{{ herbData.tier }}
                 </span>
@@ -634,10 +645,8 @@ const {
             <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
               <td class="px-3 py-2 text-yellow-300">
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded mr-1',
-                    TIER_BADGE_CLASSES[herbData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded mr-1', tierBg(herbData.tier)]"
+                  :style="{ color: tierTextColor(herbData.tier) }"
                 >
                   T{{ herbData.tier }}
                 </span>

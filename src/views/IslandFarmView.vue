@@ -2,7 +2,8 @@
 import { useFarmingCalculator } from '@/composables/useFarmingCalculator'
 import {
   CROP_OPTIONS,
-  TIER_BADGE_CLASSES,
+  tierBg,
+  tierTextColor,
   fmt,
   profitColorClass,
   marginColorClass,
@@ -12,6 +13,7 @@ import {
 const {
   // State
   crop,
+  seedsPerPlot,
   specFarming,
   specCultura,
   seedsWatered,
@@ -135,7 +137,7 @@ const {
 
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="flex flex-col gap-1">
-            <label class="text-xs text-gray-500">Spec. em Fazendeiro (0–100)</label>
+            <label class="text-xs text-gray-500">Especialização em Fazendeiro (0–100)</label>
             <input
               type="number"
               v-model.number="specFarming"
@@ -145,7 +147,9 @@ const {
             />
           </div>
           <div class="flex flex-col gap-1">
-            <label class="text-xs text-gray-500">Spec. em {{ cropData.name }} (0–100)</label>
+            <label class="text-xs text-gray-500"
+              >Especialização em {{ cropData.name }} (0–100)</label
+            >
             <input
               type="number"
               v-model.number="specCultura"
@@ -230,26 +234,38 @@ const {
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Fazenda &amp; Irrigação
         </h2>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="text-xs text-gray-500 mb-2 block">Número de fazendas</label>
+            <input
+              type="number"
+              v-model.number="plots"
+              min="1"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
+          </div>
 
-        <div class="mb-4">
-          <label class="text-xs text-gray-500 mb-2 block">Número de fazendas</label>
-          <input
-            type="number"
-            v-model.number="plots"
-            min="1"
-            class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-          />
+          <div>
+            <label class="text-xs text-gray-500 mb-2 block">Plantas / fazenda (máx. 9)</label>
+            <input
+              type="number"
+              v-model.number="seedsPerPlot"
+              min="1"
+              max="9"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
+          </div>
         </div>
 
         <div class="border-t border-gray-700 pt-4 mb-4">
           <label class="text-xs text-gray-500 mb-2 block"
-            >Total de sementes irrigadas (máx. {{ 9 * plots }})</label
+            >Total de sementes irrigadas (máx. {{ seedsPerPlot * plots }})</label
           >
           <input
             type="number"
             v-model.number="seedsWatered"
             min="0"
-            :max="9 * plots"
+            :max="seedsPerPlot * plots"
             class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
           />
           <div class="flex items-center justify-between text-xs text-gray-500 mt-1.5">
@@ -264,11 +280,15 @@ const {
           <div class="space-y-1 text-xs">
             <div class="flex justify-between">
               <span class="text-gray-500">Sementes plantadas</span>
-              <span class="text-gray-300 font-semibold">9 × {{ plots }} = {{ 9 * plots }}</span>
+              <span class="text-gray-300 font-semibold"
+                >{{ seedsPerPlot }} × {{ plots }} = {{ seedsPerPlot * plots }}</span
+              >
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Colheita esperada / fazenda</span>
-              <span class="text-gray-300 font-semibold">~{{ cropYieldAvg.toFixed(1) }} × 9</span>
+              <span class="text-gray-300 font-semibold"
+                >~{{ cropYieldAvg.toFixed(1) }} × {{ seedsPerPlot }}</span
+              >
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Tempo de crescimento</span>
@@ -313,10 +333,8 @@ const {
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded',
-                    TIER_BADGE_CLASSES[cropData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded', tierBg(cropData.tier)]"
+                  :style="{ color: tierTextColor(cropData.tier) }"
                 >
                   T{{ cropData.tier }}
                 </span>
@@ -338,10 +356,8 @@ const {
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded',
-                    TIER_BADGE_CLASSES[cropData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded', tierBg(cropData.tier)]"
+                  :style="{ color: tierTextColor(cropData.tier) }"
                 >
                   T{{ cropData.tier }}
                 </span>
@@ -362,7 +378,7 @@ const {
               <div
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
-                <span class="text-xs font-bold px-1 rounded bg-gray-600 text-gray-100">T1</span>
+                <span class="text-xs font-bold px-1 rounded bg-[#707070] text-white">T1</span>
                 Minhoca
               </div>
               <span class="text-gray-600 text-xs mb-1">(opcional)</span>
@@ -445,10 +461,8 @@ const {
                   class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
                 >
                   <span
-                    :class="[
-                      'text-xs font-bold px-1 rounded',
-                      TIER_BADGE_CLASSES[cropData.tier] ?? 'bg-gray-600 text-gray-100',
-                    ]"
+                    :class="['text-xs font-bold px-1 rounded', tierBg(cropData.tier)]"
+                    :style="{ color: tierTextColor(cropData.tier) }"
                   >
                     T{{ cropData.tier }}
                   </span>
@@ -464,10 +478,8 @@ const {
                   class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
                 >
                   <span
-                    :class="[
-                      'text-xs font-bold px-1 rounded',
-                      TIER_BADGE_CLASSES[cropData.tier] ?? 'bg-gray-600 text-gray-100',
-                    ]"
+                    :class="['text-xs font-bold px-1 rounded', tierBg(cropData.tier)]"
+                    :style="{ color: tierTextColor(cropData.tier) }"
                   >
                     T{{ cropData.tier }}
                   </span>
@@ -484,7 +496,7 @@ const {
                 <div
                   class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
                 >
-                  <span class="text-xs font-bold px-1 rounded bg-gray-600 text-gray-100">T1</span>
+                  <span class="text-xs font-bold px-1 rounded bg-[#707070] text-white">T1</span>
                   Minhoca
                 </div>
               </div>
@@ -617,10 +629,8 @@ const {
             <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
               <td class="px-3 py-2 text-yellow-300">
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded mr-1',
-                    TIER_BADGE_CLASSES[cropData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded mr-1', tierBg(cropData.tier)]"
+                  :style="{ color: tierTextColor(cropData.tier) }"
                 >
                   T{{ cropData.tier }}
                 </span>
@@ -643,10 +653,8 @@ const {
             <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
               <td class="px-3 py-2 text-yellow-300">
                 <span
-                  :class="[
-                    'text-xs font-bold px-1 rounded mr-1',
-                    TIER_BADGE_CLASSES[cropData.tier] ?? 'bg-gray-600 text-gray-100',
-                  ]"
+                  :class="['text-xs font-bold px-1 rounded mr-1', tierBg(cropData.tier)]"
+                  :style="{ color: tierTextColor(cropData.tier) }"
                 >
                   T{{ cropData.tier }}
                 </span>

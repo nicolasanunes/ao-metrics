@@ -206,6 +206,25 @@ export const BASE_FOCUS_STONE: Record<number, Record<number, number>> = {
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
 
+const TIER_BG_MAP: Record<number, string> = {
+  1: 'bg-[#707070]',
+  2: 'bg-[#7A6540]',
+  3: 'bg-[#567043]',
+  4: 'bg-[#557E98]',
+  5: 'bg-[#934038]',
+  6: 'bg-[#D8894C]',
+  7: 'bg-[#E8C95F]',
+  8: 'bg-[#E8E8E8]',
+}
+
+const SUBTIER_HEX: Record<number, string> = {
+  1: '#3CB371',
+  2: '#4169E1',
+  3: '#9400D3',
+  4: '#FFD700',
+}
+
+// Used for enchantment selector button active states
 export const SUBTIER_COLORS: Record<number, string> = {
   0: 'bg-gray-600 text-gray-100',
   1: 'bg-green-700 text-green-100',
@@ -218,8 +237,21 @@ export function tierLabel(t: number, s: number = 0): string {
   return s > 0 ? `T${t}.${s}` : `T${t}`
 }
 
-export function tierBadge(t: number, s: number = 0): { label: string; classes: string } {
-  return { label: tierLabel(t, s), classes: SUBTIER_COLORS[s] ?? 'bg-gray-600 text-gray-100' }
+export function tierBadge(
+  t: number,
+  s: number = 0,
+): {
+  label: string
+  bg: string
+  tierColor: string
+  tier: number
+  subtier: number
+  subtierColor: string | null
+} {
+  const bg = TIER_BG_MAP[t] ?? 'bg-[#707070]'
+  const tierColor = t === 7 || t === 8 ? '#111827' : '#ffffff'
+  const subtierColor = s > 0 ? (SUBTIER_HEX[s] ?? null) : null
+  return { label: tierLabel(t, s), bg, tierColor, tier: t, subtier: s, subtierColor }
 }
 
 export function fmt(n: number): string {

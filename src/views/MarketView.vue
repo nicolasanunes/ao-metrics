@@ -19,21 +19,41 @@ function normalize(str: string) {
     .toLowerCase()
 }
 
-const SUBTIER_CLASSES: Record<number, string> = {
-  0: 'bg-gray-600 text-gray-100',
-  1: 'bg-green-700 text-green-100',
-  2: 'bg-blue-700 text-blue-100',
-  3: 'bg-purple-700 text-purple-100',
-  4: 'bg-yellow-600 text-yellow-100',
+const TIER_CLASSES: Record<number, string> = {
+  1: 'bg-[#707070] text-white',
+  2: 'bg-[#7A6540] text-white',
+  3: 'bg-[#567043] text-white',
+  4: 'bg-[#557E98] text-white',
+  5: 'bg-[#934038] text-white',
+  6: 'bg-[#D8894C] text-white',
+  7: 'bg-[#E8C95F] text-gray-900',
+  8: 'bg-[#E8E8E8] text-gray-900',
 }
 
-function tierBadge(id: string): { label: string; classes: string } {
+const SUBTIER_TEXT: Record<number, string> = {
+  1: '#3CB371',
+  2: '#4169E1',
+  3: '#9400D3',
+  4: '#FFD700',
+}
+
+function tierBadge(id: string): {
+  bg: string
+  tierColor: string
+  tier: number
+  subtier: number
+  subtierColor: string | null
+} {
   const tierMatch = id.match(/^T(\d+)_/i)
   const subtierMatch = id.match(/@(\d+)$/)
-  const tier = tierMatch ? tierMatch[1] : '?'
+  const tier = tierMatch ? Number(tierMatch[1]) : 0
   const subtier = subtierMatch ? Number(subtierMatch[1]) : 0
-  const classes = SUBTIER_CLASSES[subtier] ?? 'bg-gray-600 text-gray-100'
-  return { label: `${tier}.${subtier}`, classes }
+  const tierClass = TIER_CLASSES[tier] ?? 'bg-[#707070] text-white'
+  // extract bg and default tier text from the class string
+  const bg = tierClass.split(' ')[0]!
+  const tierColor = tierClass.includes('text-gray-900') ? '#111827' : '#ffffff'
+  const subtierColor = subtier > 0 ? (SUBTIER_TEXT[subtier] ?? null) : null
+  return { bg, tierColor, tier, subtier, subtierColor }
 }
 
 function baseId(id: string) {
@@ -261,10 +281,16 @@ function dateBgClass(dateStr: string): string {
               <span
                 :class="[
                   'text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0',
-                  tierBadge(item.id).classes,
+                  tierBadge(item.id).bg,
                 ]"
               >
-                {{ tierBadge(item.id).label }}
+                <span :style="{ color: tierBadge(item.id).tierColor }"
+                  >T{{ tierBadge(item.id).tier }}</span
+                ><span
+                  v-if="tierBadge(item.id).subtier > 0"
+                  :style="{ color: tierBadge(item.id).subtierColor! }"
+                  >.{{ tierBadge(item.id).subtier }}</span
+                >
               </span>
               {{ item.name }}
             </li>
@@ -278,8 +304,13 @@ function dateBgClass(dateStr: string): string {
             :key="id"
             class="inline-flex items-center gap-1 bg-yellow-400/10 text-yellow-300 text-xs px-2 py-1 rounded-full border border-yellow-400/30"
           >
-            <span :class="['text-xs font-bold px-1 rounded', tierBadge(id).classes]">
-              {{ tierBadge(id).label }}
+            <span :class="['text-xs font-bold px-1 rounded', tierBadge(id).bg]">
+              <span :style="{ color: tierBadge(id).tierColor }">T{{ tierBadge(id).tier }}</span
+              ><span
+                v-if="tierBadge(id).subtier > 0"
+                :style="{ color: tierBadge(id).subtierColor! }"
+                >.{{ tierBadge(id).subtier }}</span
+              >
             </span>
             {{ itemName(id) }}
 
@@ -468,10 +499,14 @@ function dateBgClass(dateStr: string): string {
             >
               <td class="px-3 py-2 text-xs text-yellow-300">
                 <span class="inline-flex items-center gap-1.5">
-                  <span
-                    :class="['font-bold px-1.5 py-0.5 rounded', tierBadge(row.item_id).classes]"
-                  >
-                    {{ tierBadge(row.item_id).label }}
+                  <span :class="['font-bold px-1.5 py-0.5 rounded', tierBadge(row.item_id).bg]">
+                    <span :style="{ color: tierBadge(row.item_id).tierColor }"
+                      >T{{ tierBadge(row.item_id).tier }}</span
+                    ><span
+                      v-if="tierBadge(row.item_id).subtier > 0"
+                      :style="{ color: tierBadge(row.item_id).subtierColor! }"
+                      >.{{ tierBadge(row.item_id).subtier }}</span
+                    >
                   </span>
                   {{ itemName(row.item_id) }}
                 </span>

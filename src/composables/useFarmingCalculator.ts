@@ -103,13 +103,23 @@ export const CROP_OPTIONS: Array<{ value: CropKey; label: string; tier: number }
 ]
 
 export const TIER_BADGE_CLASSES: Record<number, string> = {
-  2: 'bg-gray-600 text-gray-100',
-  3: 'bg-green-700 text-green-100',
-  4: 'bg-blue-700 text-blue-100',
-  5: 'bg-purple-700 text-purple-100',
-  6: 'bg-yellow-600 text-yellow-100',
-  7: 'bg-orange-600 text-orange-100',
-  8: 'bg-red-700 text-red-100',
+  1: 'bg-[#707070] text-white',
+  2: 'bg-[#7A6540] text-white',
+  3: 'bg-[#567043] text-white',
+  4: 'bg-[#557E98] text-white',
+  5: 'bg-[#934038] text-white',
+  6: 'bg-[#D8894C] text-white',
+  7: 'bg-[#E8C95F] text-gray-900',
+  8: 'bg-[#E8E8E8] text-gray-900',
+}
+
+export function tierBg(tier: number): string {
+  const entry = TIER_BADGE_CLASSES[tier]
+  return entry ? entry.split(' ')[0]! : 'bg-[#707070]'
+}
+
+export function tierTextColor(tier: number): string {
+  return tier === 7 || tier === 8 ? '#111827' : '#ffffff'
 }
 
 export function fmt(n: number): string {
@@ -137,13 +147,12 @@ export function marginBgClass(pct: number | null): string {
   return 'bg-green-900/20 border border-green-700/40'
 }
 
-const SEEDS_PER_PLOT = 9
-
 // ── Composable ────────────────────────────────────────────────────────────
 
 export function useFarmingCalculator() {
   // ── State ──────────────────────────────────────────────────────────────
 
+  const seedsPerPlot = ref(9)
   const crop = ref<CropKey>('wheat')
   const specFarming = ref(100) // 0–100
   const specCultura = ref(0) // 0–100
@@ -158,15 +167,22 @@ export function useFarmingCalculator() {
 
   // Clamp seedsWatered when plots changes
   watch(plots, (newPlots) => {
-    const max = newPlots * SEEDS_PER_PLOT
+    const max = newPlots * seedsPerPlot.value
     if (seedsWatered.value > max) seedsWatered.value = max
     if (newPlots < 1) plots.value = 1
   })
 
   watch(seedsWatered, (v) => {
-    const max = plots.value * SEEDS_PER_PLOT
+    const max = plots.value * seedsPerPlot.value
     if (v > max) seedsWatered.value = max
     if (v < 0) seedsWatered.value = 0
+  })
+
+  watch(seedsPerPlot, (v) => {
+    if (v > 9) seedsPerPlot.value = 9
+    if (v < 1) seedsPerPlot.value = 1
+    const max = plots.value * seedsPerPlot.value
+    if (seedsWatered.value > max) seedsWatered.value = max
   })
 
   watch(specFarming, (v) => {
@@ -197,8 +213,8 @@ export function useFarmingCalculator() {
     plots.value > 0 ? seedsWatered.value / plots.value : 0,
   )
   /** Total unwatered seeds across all plots */
-  const seedsUnwatered = computed(() => SEEDS_PER_PLOT * plots.value - seedsWatered.value)
-  const seedsUnwateredPerPlot = computed(() => SEEDS_PER_PLOT - seedsWateredPerPlot.value)
+  const seedsUnwatered = computed(() => seedsPerPlot.value * plots.value - seedsWatered.value)
+  const seedsUnwateredPerPlot = computed(() => seedsPerPlot.value - seedsWateredPerPlot.value)
   const cropYieldAvg = computed(() => (premium.value ? 9 : 4.5))
   const cityMult = computed(() => (cityBonus.value ? 1.1 : 1.0))
   const earthwormDrops = computed(() => (premium.value ? 2 : 1))
@@ -211,13 +227,13 @@ export function useFarmingCalculator() {
       seedsUnwateredPerPlot.value * cropData.value.yieldUnwatered,
   )
 
-  const cropsHarvested = computed(() => SEEDS_PER_PLOT * cropYieldAvg.value * cityMult.value)
+  const cropsHarvested = computed(() => seedsPerPlot.value * cropYieldAvg.value * cityMult.value)
 
-  const earthworms = computed(() => SEEDS_PER_PLOT * 0.1 * earthwormDrops.value)
+  const earthworms = computed(() => seedsPerPlot.value * 0.1 * earthwormDrops.value)
 
   const focusThisCycle = computed(() => seedsWateredPerPlot.value * focusPerSeed.value)
 
-  const totalFame = computed(() => SEEDS_PER_PLOT * famePerHarvest.value)
+  const totalFame = computed(() => seedsPerPlot.value * famePerHarvest.value)
 
   // ── Per-plot financials ────────────────────────────────────────────────
 
@@ -228,7 +244,7 @@ export function useFarmingCalculator() {
       earthworms.value * priceEarthworm.value,
   )
 
-  const cost = computed(() => SEEDS_PER_PLOT * priceSeed.value)
+  const cost = computed(() => seedsPerPlot.value * priceSeed.value)
   const netProfit = computed(() => revenue.value - cost.value)
 
   // ── Scaled by number of plots ──────────────────────────────────────────
@@ -252,7 +268,7 @@ export function useFarmingCalculator() {
   /**
    * Returns whether the player gets at least as many seeds back as planted.
    */
-  const isSeedSustainable = computed(() => seedsBack.value >= SEEDS_PER_PLOT)
+  const isSeedSustainable = computed(() => seedsBack.value >= seedsPerPlot.value)
 
   /** Cities that grant +10% bonus for the currently selected crop */
   const bonusCities = computed(() => CROP_CITY_BONUS[crop.value])
@@ -260,6 +276,7 @@ export function useFarmingCalculator() {
   return {
     // state
     crop,
+    seedsPerPlot,
     specFarming,
     specCultura,
     seedsWatered,

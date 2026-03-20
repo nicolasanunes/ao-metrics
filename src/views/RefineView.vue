@@ -214,9 +214,12 @@ const {
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded flex items-center gap-1.5">
               <strong>{{ rawQty }}×</strong>
-              <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
-                rawBadge.label
-              }}</span>
+              <span :class="['text-xs font-bold px-1 rounded', rawBadge.bg]"
+                ><span :style="{ color: rawBadge.tierColor }">T{{ rawBadge.tier }}</span
+                ><span v-if="rawBadge.subtier > 0" :style="{ color: rawBadge.subtierColor! }"
+                  >.{{ rawBadge.subtier }}</span
+                ></span
+              >
               {{ rawDisplayName }}
             </span>
             <span v-if="hasSubIngredient" class="text-gray-500 text-xs">+</span>
@@ -225,9 +228,12 @@ const {
               class="bg-gray-700 text-yellow-300 px-2 py-1 rounded flex items-center gap-1.5"
             >
               <strong>{{ subQty }}×</strong>
-              <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
-                subBadge.label
-              }}</span>
+              <span :class="['text-xs font-bold px-1 rounded', subBadge.bg]"
+                ><span :style="{ color: subBadge.tierColor }">T{{ subBadge.tier }}</span
+                ><span v-if="subBadge.subtier > 0" :style="{ color: subBadge.subtierColor! }"
+                  >.{{ subBadge.subtier }}</span
+                ></span
+              >
               {{ subRefinedDisplayName }}
             </span>
             <span class="text-gray-500 text-xs">→</span>
@@ -235,9 +241,14 @@ const {
               class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-2 py-1 rounded flex items-center gap-1.5"
             >
               <strong>{{ outputYield }}×</strong>
-              <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
-                refinedBadge.label
-              }}</span>
+              <span :class="['text-xs font-bold px-1 rounded', refinedBadge.bg]"
+                ><span :style="{ color: refinedBadge.tierColor }">T{{ refinedBadge.tier }}</span
+                ><span
+                  v-if="refinedBadge.subtier > 0"
+                  :style="{ color: refinedBadge.subtierColor! }"
+                  >.{{ refinedBadge.subtier }}</span
+                ></span
+              >
               {{ refinedDisplayName }}
             </span>
           </div>
@@ -429,9 +440,12 @@ const {
               <div
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
-                <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
-                  rawBadge.label
-                }}</span>
+                <span :class="['text-xs font-bold px-1 rounded', rawBadge.bg]"
+                  ><span :style="{ color: rawBadge.tierColor }">T{{ rawBadge.tier }}</span
+                  ><span v-if="rawBadge.subtier > 0" :style="{ color: rawBadge.subtierColor! }"
+                    >.{{ rawBadge.subtier }}</span
+                  ></span
+                >
                 {{ rawDisplayName }}
               </div>
             </div>
@@ -449,9 +463,12 @@ const {
               <div
                 class="bg-gray-700 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
-                <span :class="['text-xs font-bold px-1 rounded', subBadge.classes]">{{
-                  subBadge.label
-                }}</span>
+                <span :class="['text-xs font-bold px-1 rounded', subBadge.bg]"
+                  ><span :style="{ color: subBadge.tierColor }">T{{ subBadge.tier }}</span
+                  ><span v-if="subBadge.subtier > 0" :style="{ color: subBadge.subtierColor! }"
+                    >.{{ subBadge.subtier }}</span
+                  ></span
+                >
                 {{ subRefinedDisplayName }}
               </div>
             </div>
@@ -482,9 +499,14 @@ const {
               <div
                 class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
               >
-                <span :class="['text-xs font-bold px-1 rounded', refinedBadge.classes]">{{
-                  refinedBadge.label
-                }}</span>
+                <span :class="['text-xs font-bold px-1 rounded', refinedBadge.bg]"
+                  ><span :style="{ color: refinedBadge.tierColor }">T{{ refinedBadge.tier }}</span
+                  ><span
+                    v-if="refinedBadge.subtier > 0"
+                    :style="{ color: refinedBadge.subtierColor! }"
+                    >.{{ refinedBadge.subtier }}</span
+                  ></span
+                >
                 {{ refinedDisplayName }}
               </div>
               <span class="text-gray-600 text-xs mb-1">(opcional)</span>
@@ -536,9 +558,12 @@ const {
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Configuração ativa</p>
           <div class="flex flex-wrap gap-1.5 text-xs">
             <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300 flex items-center gap-1">
-              <span :class="['text-xs font-bold px-1 rounded', rawBadge.classes]">{{
-                rawBadge.label
-              }}</span>
+              <span :class="['text-xs font-bold px-1 rounded', rawBadge.bg]"
+                ><span :style="{ color: rawBadge.tierColor }">T{{ rawBadge.tier }}</span
+                ><span v-if="rawBadge.subtier > 0" :style="{ color: rawBadge.subtierColor! }"
+                  >.{{ rawBadge.subtier }}</span
+                ></span
+              >
               {{ rawDisplayName }}
             </span>
             <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300">
@@ -645,9 +670,11 @@ const {
             <!-- Raw material row -->
             <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
               <td class="px-3 py-2 text-yellow-300">
-                <span :class="['text-xs font-bold px-1 rounded mr-1', rawBadge.classes]">{{
-                  rawBadge.label
-                }}</span
+                <span :class="['text-xs font-bold px-1 rounded mr-1', rawBadge.bg]"
+                  ><span :style="{ color: rawBadge.tierColor }">T{{ rawBadge.tier }}</span
+                  ><span v-if="rawBadge.subtier > 0" :style="{ color: rawBadge.subtierColor! }"
+                    >.{{ rawBadge.subtier }}</span
+                  ></span
                 >{{ rawDisplayName }}
               </td>
               <td class="px-3 py-2 text-gray-400">{{ rawQty }}×</td>
@@ -667,9 +694,11 @@ const {
               class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
             >
               <td class="px-3 py-2 text-yellow-300">
-                <span :class="['text-xs font-bold px-1 rounded mr-1', subBadge.classes]">{{
-                  subBadge.label
-                }}</span
+                <span :class="['text-xs font-bold px-1 rounded mr-1', subBadge.bg]"
+                  ><span :style="{ color: subBadge.tierColor }">T{{ subBadge.tier }}</span
+                  ><span v-if="subBadge.subtier > 0" :style="{ color: subBadge.subtierColor! }"
+                    >.{{ subBadge.subtier }}</span
+                  ></span
                 >{{ subRefinedDisplayName }}
               </td>
               <td class="px-3 py-2 text-gray-400">{{ subQty }}×</td>

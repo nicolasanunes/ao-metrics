@@ -106,6 +106,10 @@ const isValid = computed(
     selectedQualities.value.length > 0,
 )
 
+const results = ref<PriceData[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
 const previewUrl = computed(() =>
   isValid.value
     ? buildQueryUrl({
@@ -115,10 +119,6 @@ const previewUrl = computed(() =>
       })
     : null,
 )
-
-const results = ref<PriceData[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
 
 let currentAbortController: AbortController | null = null
 

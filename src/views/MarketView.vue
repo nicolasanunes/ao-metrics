@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Quality, type Item, Location } from '@/types/items'
-import { fetchPrices, type PriceData } from '@/services/marketService'
+import { fetchPrices, buildQueryUrl, type PriceData } from '@/services/marketService'
 import { useItemsStore } from '@/stores/items'
 import NoteInformation from '@/components/NoteInformation.vue'
 
@@ -104,6 +104,16 @@ const isValid = computed(
     selectedItems.value.length > 0 &&
     selectedLocations.value.length > 0 &&
     selectedQualities.value.length > 0,
+)
+
+const previewUrl = computed(() =>
+  isValid.value
+    ? buildQueryUrl({
+        ids: selectedItems.value,
+        locations: selectedLocations.value,
+        qualities: selectedQualities.value,
+      })
+    : null,
 )
 
 const results = ref<PriceData[]>([])

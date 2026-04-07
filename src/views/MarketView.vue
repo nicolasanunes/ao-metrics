@@ -419,10 +419,10 @@ function dateBgClass(dateStr: string): string {
     </div>
 
     <!-- URL Preview -->
-    <div v-if="previewUrl" class="bg-gray-900 rounded-xl p-4 mb-4">
+    <!-- <div v-if="previewUrl" class="bg-gray-900 rounded-xl p-4 mb-4">
       <p class="text-xs text-gray-400 mb-1">Query URL</p>
       <code class="text-xs text-green-400 break-all">{{ previewUrl }}</code>
-    </div>
+    </div> -->
 
     <!-- Error -->
     <div v-if="error" class="mt-4 bg-red-900/50 border border-red-700 rounded-xl p-4 text-red-300">

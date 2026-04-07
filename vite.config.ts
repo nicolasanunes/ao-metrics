@@ -6,14 +6,15 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig({
-  // server: {
-  //   host: '192.168.10.15',
-  // },
+export default defineConfig(({ command }) => ({
+  base: command === 'serve' ? '/' : '/ao-metrics/',
+  server: {
+    host: '192.168.10.19',
+  },
   plugins: [vue(), vueDevTools(), tailwindcss()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-})
+}))

@@ -2,9 +2,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Quality, type Item, Location } from '@/types/items'
-import { fetchPrices, buildQueryUrl, type PriceData } from '@/services/marketService'
+import { fetchPrices, type PriceData } from '@/services/marketService'
 import { useItemsStore } from '@/stores/items'
 import NoteInformation from '@/components/NoteInformation.vue'
+import { tierBadgeClasses } from '@/data/tierColors'
 
 const itemsStore = useItemsStore()
 onMounted(() => itemsStore.load())
@@ -19,41 +20,20 @@ function normalize(str: string) {
     .toLowerCase()
 }
 
-const TIER_CLASSES: Record<number, string> = {
-  1: 'bg-[#707070] text-white',
-  2: 'bg-[#7A6540] text-white',
-  3: 'bg-[#567043] text-white',
-  4: 'bg-[#557E98] text-white',
-  5: 'bg-[#934038] text-white',
-  6: 'bg-[#D8894C] text-white',
-  7: 'bg-[#E8C95F] text-gray-900',
-  8: 'bg-[#E8E8E8] text-gray-900',
-}
-
-const SUBTIER_TEXT: Record<number, string> = {
-  1: '#3CB371',
-  2: '#4169E1',
-  3: '#9400D3',
-  4: '#FFD700',
-}
+const { itemMap: itemLabel } = storeToRefs(itemsStore)
 
 function tierBadge(id: string): {
   bg: string
   tierColor: string
   tier: number
   subtier: number
-  subtierColor: string | null
 } {
   const tierMatch = id.match(/^T(\d+)_/i)
   const subtierMatch = id.match(/@(\d+)$/)
   const tier = tierMatch ? Number(tierMatch[1]) : 0
   const subtier = subtierMatch ? Number(subtierMatch[1]) : 0
-  const tierClass = TIER_CLASSES[tier] ?? 'bg-[#707070] text-white'
-  // extract bg and default tier text from the class string
-  const bg = tierClass.split(' ')[0]!
-  const tierColor = tierClass.includes('text-gray-900') ? '#111827' : '#ffffff'
-  const subtierColor = subtier > 0 ? (SUBTIER_TEXT[subtier] ?? null) : null
-  return { bg, tierColor, tier, subtier, subtierColor }
+  const { bg, tierColor } = tierBadgeClasses(tier)
+  return { bg, tierColor, tier, subtier }
 }
 
 function baseId(id: string) {
@@ -69,6 +49,14 @@ const filteredItems = computed(() => {
   if (!q) return []
   return itemsStore.items
     .filter((item) => normalize(item.name).includes(q) || normalize(item.id).includes(q))
+    .sort((a, b) => {
+      const baseA = baseId(a.id)
+      const baseB = baseId(b.id)
+      if (baseA !== baseB) return baseA.localeCompare(baseB)
+      const subA = a.id.includes('@') ? Number(a.id.split('@')[1]) : 0
+      const subB = b.id.includes('@') ? Number(b.id.split('@')[1]) : 0
+      return subA - subB
+    })
     .slice(0, 30)
 })
 
@@ -82,7 +70,6 @@ function addItem(id: string) {
 
 function removeItem(id: string) {
   selectedItems.value = selectedItems.value.filter((i) => i !== id)
-  search()
 }
 
 const allLocations = Object.values(Location)
@@ -90,7 +77,7 @@ const allLocations = Object.values(Location)
 const qualityOptions = [
   { label: 'Normal', value: Quality.NORMAL },
   { label: 'Bom', value: Quality.GOOD },
-  { label: 'Notável', value: Quality.OUTSTANDING },
+  { label: 'Excepcional', value: Quality.OUTSTANDING },
   { label: 'Excelente', value: Quality.EXCELLENT },
   { label: 'Obra-prima', value: Quality.MASTERPIECE },
 ]
@@ -109,16 +96,6 @@ const isValid = computed(
 const results = ref<PriceData[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
-
-const previewUrl = computed(() =>
-  isValid.value
-    ? buildQueryUrl({
-        ids: selectedItems.value,
-        locations: selectedLocations.value,
-        qualities: selectedQualities.value,
-      })
-    : null,
-)
 
 let currentAbortController: AbortController | null = null
 
@@ -172,8 +149,6 @@ function toggleAllLocations() {
 const qualityLabel: Record<number, string> = Object.fromEntries(
   qualityOptions.map((q) => [q.value, q.label]),
 )
-
-const { itemMap: itemLabel } = storeToRefs(itemsStore)
 
 type SortKey =
   | 'item_label'
@@ -234,17 +209,19 @@ const SENTINEL_DATE = '0001-01-01'
 
 function formatDate(dateStr: string) {
   if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return '-'
-  const date = new Date(dateStr)
+  const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
+  const date = new Date(normalized)
   if (isNaN(date.getTime())) return '-'
   return date.toLocaleString('pt-BR', { timeZone: 'UTC' })
 }
 
 function dateBgClass(dateStr: string): string {
   if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return ''
-  const date = new Date(dateStr)
+  const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
+  const date = new Date(normalized)
   if (isNaN(date.getTime())) return ''
   const hoursAgo = (Date.now() - date.getTime()) / 1000 / 3600
-  if (hoursAgo <= 1) return 'bg-blue-900/60 text-blue-300'
+  if (hoursAgo < 0.5) return 'bg-blue-900/60 text-blue-300'
   if (hoursAgo < 6) return 'bg-green-900/60 text-green-300'
   if (hoursAgo < 24) return 'bg-yellow-900/60 text-yellow-300'
   return 'bg-red-900/60 text-red-300'
@@ -253,11 +230,11 @@ function dateBgClass(dateStr: string): string {
 
 <template>
   <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
-    <h1 class="text-2xl font-bold mb-6 text-yellow-400">AO Market Search</h1>
+    <h1 class="text-2xl font-bold mb-6 text-yellow-400">Mercado do Albion Online</h1>
 
     <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- Items -->
-      <div class="bg-gray-900 rounded-xl p-4 flex-1">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1 flex flex-col relative">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Itens</h2>
 
         <div class="text-xs text-gray-500 mb-2" v-if="itemsStore.loading">Carregando items...</div>
@@ -298,7 +275,7 @@ function dateBgClass(dateStr: string): string {
                   >T{{ tierBadge(item.id).tier }}</span
                 ><span
                   v-if="tierBadge(item.id).subtier > 0"
-                  :style="{ color: tierBadge(item.id).subtierColor! }"
+                  :style="{ color: tierBadge(item.id).tierColor }"
                   >.{{ tierBadge(item.id).subtier }}</span
                 >
               </span>
@@ -308,7 +285,7 @@ function dateBgClass(dateStr: string): string {
         </div>
 
         <!-- Selected chips -->
-        <div class="flex flex-wrap gap-1 mt-2">
+        <div class="flex flex-wrap gap-1 mt-2 pb-12">
           <span
             v-for="id in selectedItems"
             :key="id"
@@ -316,9 +293,7 @@ function dateBgClass(dateStr: string): string {
           >
             <span :class="['text-xs font-bold px-1 rounded', tierBadge(id).bg]">
               <span :style="{ color: tierBadge(id).tierColor }">T{{ tierBadge(id).tier }}</span
-              ><span
-                v-if="tierBadge(id).subtier > 0"
-                :style="{ color: tierBadge(id).subtierColor! }"
+              ><span v-if="tierBadge(id).subtier > 0" :style="{ color: tierBadge(id).tierColor }"
                 >.{{ tierBadge(id).subtier }}</span
               >
             </span>
@@ -335,6 +310,15 @@ function dateBgClass(dateStr: string): string {
             >Nenhum item selecionado</span
           >
         </div>
+
+        <!-- Search button -->
+        <button
+          @click="search"
+          :disabled="!isValid || loading"
+          class="absolute bottom-4 left-4 right-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer bg-yellow-400 text-gray-900 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {{ loading ? 'Buscando...' : 'Atualizar preços' }}
+        </button>
       </div>
 
       <!-- ▸ step arrow -->
@@ -514,7 +498,7 @@ function dateBgClass(dateStr: string): string {
                       >T{{ tierBadge(row.item_id).tier }}</span
                     ><span
                       v-if="tierBadge(row.item_id).subtier > 0"
-                      :style="{ color: tierBadge(row.item_id).subtierColor! }"
+                      :style="{ color: tierBadge(row.item_id).tierColor }"
                       >.{{ tierBadge(row.item_id).subtier }}</span
                     >
                   </span>

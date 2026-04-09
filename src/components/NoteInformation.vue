@@ -54,13 +54,13 @@ function onParchmentOpened() {
           <li class="flex items-center gap-3">
             <span class="color-dot bg-blue-700 flex-shrink-0" />
             <span class="legend-text">
-              <strong>Azul</strong> - Atualizado há menos de <strong>1 hora</strong>
+              <strong>Azul</strong> - Atualizado há menos de <strong>30min</strong>
             </span>
           </li>
           <li class="flex items-center gap-3">
             <span class="color-dot bg-green-700 flex-shrink-0" />
             <span class="legend-text">
-              <strong>Verde</strong> - Entre <strong>1h</strong> e <strong>6h</strong> atrás
+              <strong>Verde</strong> - Entre <strong>30min</strong> e <strong>6h</strong> atrás
             </span>
           </li>
           <li class="flex items-center gap-3">
@@ -72,7 +72,7 @@ function onParchmentOpened() {
           <li class="flex items-center gap-3">
             <span class="color-dot bg-red-700 flex-shrink-0" />
             <span class="legend-text">
-              <strong>Vermelho</strong> - Mais de <strong>24 horas</strong> atrás
+              <strong>Vermelho</strong> - Mais de <strong>24h</strong> atrás
             </span>
           </li>
           <li class="flex items-center gap-3">

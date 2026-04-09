@@ -3,7 +3,7 @@ export type Item = string
 export interface SearchItem {
   ids: Item[]
   qualities: Quality[]
-  locations: Location[]
+  locations: string[]
 }
 
 export enum Location {
@@ -22,4 +22,8 @@ export enum Quality {
   OUTSTANDING = 3,
   EXCELLENT = 4,
   MASTERPIECE = 5,
+}
+
+export enum Market {
+  BlackMarket = 'Black Market',
 }

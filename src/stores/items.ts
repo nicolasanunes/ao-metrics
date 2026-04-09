@@ -34,12 +34,13 @@ export const useItemsStore = defineStore('items', () => {
       items.value = raw
         .filter(
           (entry) =>
-            entry.UniqueName && (entry.LocalizedNames?.['ptbr'] || entry.LocalizedNames?.['EN-US']),
+            entry.UniqueName &&
+            (entry.LocalizedNames?.['PT-BR'] || entry.LocalizedNames?.['EN-US']),
         )
         .map((entry) => ({
           id: entry.UniqueName,
           name:
-            entry.LocalizedNames?.['ptbr'] ?? entry.LocalizedNames?.['EN-US'] ?? entry.UniqueName,
+            entry.LocalizedNames?.['PT-BR'] ?? entry.LocalizedNames?.['EN-US'] ?? entry.UniqueName,
         }))
 
       loaded.value = true

@@ -18,7 +18,7 @@ export function buildQueryUrl(search: SearchItem): string {
   const base = 'https://west.albion-online-data.com/api/v2/stats/prices/'
 
   const ids = search.ids.join(',')
-  const locations = search.locations.map((l) => encodeURIComponent(l)).join(',')
+  const locations = search.locations.join(',')
   const qualities = search.qualities.join(',')
 
   return `${base}${ids}?locations=${locations}&qualities=${qualities}`

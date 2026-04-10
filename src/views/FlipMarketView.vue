@@ -334,9 +334,9 @@ const computedRows = computed(() =>
 
     <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- All equippable items info -->
-      <div class="bg-gray-900 rounded-xl p-4 flex-1 relative">
+      <div class="bg-gray-900 rounded-xl p-4 flex-1 flex flex-col">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Itens</h2>
-        <p class="text-sm text-gray-300 mb-1">
+        <p class="text-sm text-gray-300 mb-4">
           <span class="text-yellow-400 font-semibold">{{
             filteredIds.length.toLocaleString()
           }}</span>
@@ -355,7 +355,7 @@ const computedRows = computed(() =>
             !selectedTiers.length ||
             !selectedEnchantments.length
           "
-          class="absolute bottom-4 left-4 right-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-yellow-400 text-gray-950 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          class="mt-auto w-full py-2 rounded-lg text-sm font-semibold transition-colors bg-yellow-400 text-gray-950 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           {{ loading ? 'Buscando...' : 'Buscar flips' }}
         </button>
@@ -571,7 +571,7 @@ const computedRows = computed(() =>
           >
         </h2>
         <label
-          class="flex items-center gap-2 text-sm cursor-pointer hover:text-yellow-300 transition-colors ml-auto"
+          class="flex items-center gap-2 text-sm cursor-pointer hover:text-yellow-300 transition-colors w-full md:w-auto md:ml-auto"
         >
           <input type="checkbox" v-model="onlyProfitable" class="accent-yellow-400" />
           Somente lucrativos

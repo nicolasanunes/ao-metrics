@@ -4,7 +4,7 @@
     <div>
       <h1 class="text-3xl font-bold text-yellow-400 mb-2">Bem-vindo ao Albion Online Metrics</h1>
       <p class="text-gray-300 leading-relaxed">
-        O AO Metrics é uma ferramenta de análise de mercado para
+        O Albion Online Metrics é uma ferramenta de análise de mercado para
         <span class="text-yellow-300 font-medium">Albion Online</span>. Aqui você encontra
         calculadoras para refino, produção na ilha particular e análise de preços em tempo real -
         tudo em um só lugar.

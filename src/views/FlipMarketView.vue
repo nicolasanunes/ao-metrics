@@ -51,17 +51,60 @@ const qualityOptions = [
   { label: 'Obra-prima', value: Quality.MASTERPIECE },
 ]
 
-const selectedQualities = ref<Quality[]>([Quality.NORMAL])
+const selectedQualities = ref<Quality[]>([Quality.NORMAL, Quality.GOOD])
 
-const FIXED_LOCATIONS = [Location.Caerleon, Market.BlackMarket]
+const cityOptions = [
+  { label: 'Fort Sterling', value: Location.FortSterling },
+  { label: 'Lymhurst', value: Location.Lymhurst },
+  { label: 'Bridgewatch', value: Location.Bridgewatch },
+  { label: 'Martlock', value: Location.Martlock },
+  { label: 'Thetford', value: Location.Thetford },
+  { label: 'Caerleon', value: Location.Caerleon },
+  { label: 'Brecilien', value: Location.Brecilien },
+]
+
+const selectedCities = ref<Location[]>([Location.Caerleon])
+
+const tierOptions = [
+  { label: 'T2', value: 2 },
+  { label: 'T3', value: 3 },
+  { label: 'T4', value: 4 },
+  { label: 'T5', value: 5 },
+  { label: 'T6', value: 6 },
+  { label: 'T7', value: 7 },
+  { label: 'T8', value: 8 },
+]
+
+const selectedTiers = ref<number[]>([6, 7, 8])
+
+const enchantmentOptions = [
+  { label: 'Nenhum', value: 0 },
+  { label: 'Encant. 1', value: 1 },
+  { label: 'Encant. 2', value: 2 },
+  { label: 'Encant. 3', value: 3 },
+  { label: 'Encant. 4', value: 4 },
+]
+
+const selectedEnchantments = ref<number[]>([0, 1, 2, 3, 4])
+
+const filteredIds = computed(() => {
+  return allEquippableIds.value.filter((id) => {
+    const tierMatch = id.match(/^T(\d+)_/i)
+    const tier = tierMatch ? Number(tierMatch[1]) : 0
+    const enchantMatch = id.match(/@(\d+)$/)
+    const enchant = enchantMatch ? Number(enchantMatch[1]) : 0
+    return selectedTiers.value.includes(tier) && selectedEnchantments.value.includes(enchant)
+  })
+})
+
 const CHUNK_SIZE = 200
 const CONCURRENCY = 5
 
 let currentAbortController: AbortController | null = null
 
 async function search() {
-  const ids = allEquippableIds.value
-  if (!ids.length || !selectedQualities.value.length) return
+  const ids = filteredIds.value
+  if (!ids.length || !selectedQualities.value.length || !selectedCities.value.length) return
 
   currentAbortController?.abort()
   currentAbortController = new AbortController()
@@ -83,7 +126,11 @@ async function search() {
       const batchResults = await Promise.all(
         batch.map((chunk) =>
           fetchPrices(
-            { ids: chunk, locations: FIXED_LOCATIONS, qualities: selectedQualities.value },
+            {
+              ids: chunk,
+              locations: [...selectedCities.value, Market.BlackMarket],
+              qualities: selectedQualities.value,
+            },
             signal,
           ),
         ),
@@ -104,7 +151,8 @@ async function search() {
 interface FlipRow {
   item_id: string
   quality: number
-  caerleon: PriceData | null
+  sourceCity: string
+  source: PriceData | null
   blackMarket: PriceData | null
 }
 
@@ -140,41 +188,53 @@ const minProfitPct = ref<number | null>(null)
 const flipRows = computed<FlipRow[]>(() => {
   const map = new Map<string, FlipRow>()
   for (const row of results.value) {
-    const key = `${row.item_id}__${row.quality}`
-    if (!map.has(key)) {
-      map.set(key, {
-        item_id: row.item_id,
-        quality: row.quality,
-        caerleon: null,
-        blackMarket: null,
-      })
+    if (row.city === 'Black Market') {
+      for (const city of selectedCities.value) {
+        const key = `${row.item_id}__${row.quality}__${city}`
+        if (!map.has(key)) {
+          map.set(key, {
+            item_id: row.item_id,
+            quality: row.quality,
+            sourceCity: city,
+            source: null,
+            blackMarket: null,
+          })
+        }
+        map.get(key)!.blackMarket = row
+      }
+    } else if (selectedCities.value.includes(row.city as Location)) {
+      const key = `${row.item_id}__${row.quality}__${row.city}`
+      if (!map.has(key)) {
+        map.set(key, {
+          item_id: row.item_id,
+          quality: row.quality,
+          sourceCity: row.city,
+          source: null,
+          blackMarket: null,
+        })
+      }
+      map.get(key)!.source = row
     }
-    const entry = map.get(key)!
-    if (row.city === 'Caerleon') entry.caerleon = row
-    else if (row.city === 'Black Market') entry.blackMarket = row
   }
-  // keep only rows that have prices in both cities
-  return [...map.values()].filter(
-    (r) => r.caerleon?.sell_price_min && r.blackMarket?.sell_price_min,
-  )
+  // keep only rows that have prices in both source city and Black Market
+  return [...map.values()].filter((r) => r.source?.sell_price_min && r.blackMarket?.buy_price_max)
 })
 
 function profit(row: FlipRow): number | null {
-  if (!row.caerleon || !row.blackMarket) return null
-  if (row.caerleon.sell_price_min === 0 || row.blackMarket.sell_price_min === 0) return null
-  return row.blackMarket.sell_price_min - row.caerleon.sell_price_min
+  if (!row.source || !row.blackMarket) return null
+  if (row.source.sell_price_min === 0 || row.blackMarket.buy_price_max === 0) return null
+  return row.blackMarket.buy_price_max - row.source.sell_price_min
 }
 
 function profitPct(row: FlipRow): number | null {
-  if (!row.caerleon || !row.blackMarket) return null
-  if (row.caerleon.sell_price_min === 0 || row.blackMarket.sell_price_min === 0) return null
+  if (!row.source || !row.blackMarket) return null
+  if (row.source.sell_price_min === 0 || row.blackMarket.buy_price_max === 0) return null
   return (
-    ((row.blackMarket.sell_price_min - row.caerleon.sell_price_min) / row.caerleon.sell_price_min) *
-    100
+    ((row.blackMarket.buy_price_max - row.source.sell_price_min) / row.source.sell_price_min) * 100
   )
 }
 
-type SortKey = 'item_label' | 'quality' | 'caerleon_price' | 'bm_price' | 'profit' | 'profit_pct'
+type SortKey = 'item_label' | 'quality' | 'source_price' | 'bm_price' | 'profit' | 'profit_pct'
 type SortDir = 'asc' | 'desc'
 
 const sortKey = ref<SortKey>('profit_pct')
@@ -211,11 +271,11 @@ const sortedFlipRows = computed(() => {
       return itemName(a.item_id).localeCompare(itemName(b.item_id), 'pt-BR') * dir
     }
     if (key === 'quality') return (a.quality - b.quality) * dir
-    if (key === 'caerleon_price') {
-      return ((a.caerleon?.sell_price_min ?? 0) - (b.caerleon?.sell_price_min ?? 0)) * dir
+    if (key === 'source_price') {
+      return ((a.source?.sell_price_min ?? 0) - (b.source?.sell_price_min ?? 0)) * dir
     }
     if (key === 'bm_price') {
-      return ((a.blackMarket?.sell_price_min ?? 0) - (b.blackMarket?.sell_price_min ?? 0)) * dir
+      return ((a.blackMarket?.buy_price_max ?? 0) - (b.blackMarket?.buy_price_max ?? 0)) * dir
     }
     if (key === 'profit') {
       return ((profit(a) ?? -Infinity) - (profit(b) ?? -Infinity)) * dir
@@ -247,13 +307,23 @@ const computedRows = computed(() =>
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Itens</h2>
         <p class="text-sm text-gray-300 mb-1">
           <span class="text-yellow-400 font-semibold">{{
-            allEquippableIds.length.toLocaleString()
+            filteredIds.length.toLocaleString()
           }}</span>
-          itens carregados
+          itens filtrados
+          <span class="text-gray-600 text-xs ml-1"
+            >({{ allEquippableIds.length.toLocaleString() }} total)</span
+          >
         </p>
         <button
           @click="search"
-          :disabled="loading || !allEquippableIds.length || !selectedQualities.length"
+          :disabled="
+            loading ||
+            !filteredIds.length ||
+            !selectedQualities.length ||
+            !selectedCities.length ||
+            !selectedTiers.length ||
+            !selectedEnchantments.length
+          "
           class="absolute bottom-4 left-4 right-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-yellow-400 text-gray-950 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           {{ loading ? 'Buscando...' : 'Buscar flips' }}
@@ -277,26 +347,28 @@ const computedRows = computed(() =>
         </svg>
       </div>
 
-      <!-- Fixed Locations -->
+      <!-- Source Cities -->
       <div class="bg-gray-900 rounded-xl p-4 flex-1">
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          Localidades
+          Cidade de Compra
         </h2>
-        <div class="flex flex-col gap-2 mb-3">
-          <div class="flex items-center gap-2 text-sm">
-            <span class="w-2.5 h-2.5 rounded-full bg-sky-400 flex-shrink-0"></span>
-            <span class="text-gray-200">Caerleon</span>
-            <span class="text-xs text-gray-500 ml-1">(compra)</span>
-          </div>
-          <div class="flex items-center gap-2 text-sm">
-            <span class="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"></span>
-            <span class="text-gray-200">Black Market</span>
-            <span class="text-xs text-gray-500 ml-1">(venda)</span>
-          </div>
+        <label
+          v-for="c in cityOptions"
+          :key="c.value"
+          class="flex items-center gap-2 py-1 cursor-pointer hover:text-yellow-300 transition-colors"
+        >
+          <input
+            type="checkbox"
+            :value="c.value"
+            v-model="selectedCities"
+            class="accent-yellow-400"
+          />
+          <span class="text-sm">{{ c.label }}</span>
+        </label>
+        <div class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-800">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"></span>
+          <span class="text-xs text-gray-500">Vende para: Black Market (compra imediata)</span>
         </div>
-        <p class="text-xs text-gray-600 leading-relaxed">
-          Localidades fixas para calcular o lucro de flip entre as duas cidades.
-        </p>
       </div>
 
       <!-- ▸ step arrow -->
@@ -333,6 +405,80 @@ const computedRows = computed(() =>
             class="accent-yellow-400"
           />
           <span class="text-sm">{{ q.label }}</span>
+        </label>
+      </div>
+
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
+      <!-- Tier -->
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Tier</h2>
+        <div class="flex-1 flex-wrap gap-1 mb-1">
+          <label
+            v-for="t in tierOptions"
+            :key="t.value"
+            class="flex items-center gap-2 py-1 cursor-pointer hover:text-yellow-300 transition-colors"
+          >
+            <input
+              type="checkbox"
+              :value="t.value"
+              v-model="selectedTiers"
+              class="accent-yellow-400"
+            />
+            <span class="text-sm">{{ t.label }}</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ▸ step arrow -->
+      <div
+        class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+      >
+        <svg class="hidden md:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <svg class="block md:hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
+      <!-- Enchantment -->
+      <div class="bg-gray-900 rounded-xl p-4 flex-1">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Encantamento
+        </h2>
+        <label
+          v-for="e in enchantmentOptions"
+          :key="e.value"
+          class="flex items-center gap-2 py-1 cursor-pointer hover:text-yellow-300 transition-colors"
+        >
+          <input
+            type="checkbox"
+            :value="e.value"
+            v-model="selectedEnchantments"
+            class="accent-yellow-400"
+          />
+          <span class="text-sm">{{ e.label }}</span>
         </label>
       </div>
     </div>
@@ -399,19 +545,21 @@ const computedRows = computed(() =>
               >
                 Qualidade <span class="ml-1">{{ sortIndicator('quality') }}</span>
               </th>
+              <th class="px-3 py-2 text-gray-400">Cidade</th>
               <th
                 class="px-3 py-2 text-sky-400 cursor-pointer select-none hover:text-sky-300 transition-colors"
-                @click="toggleSort('caerleon_price')"
+                @click="toggleSort('source_price')"
               >
-                Caerleon (Venda Mín.)
-                <span class="ml-1">{{ sortIndicator('caerleon_price') }}</span>
+                Venda Mín.
+                <span class="ml-1">{{ sortIndicator('source_price') }}</span>
               </th>
               <th class="px-3 py-2 text-gray-500 text-xs font-normal">Atualizado em (UTC)</th>
               <th
                 class="px-3 py-2 text-red-400 cursor-pointer select-none hover:text-red-300 transition-colors"
                 @click="toggleSort('bm_price')"
               >
-                Black Market (Venda Mín.) <span class="ml-1">{{ sortIndicator('bm_price') }}</span>
+                Black Market (Compra Imediata)
+                <span class="ml-1">{{ sortIndicator('bm_price') }}</span>
               </th>
               <th class="px-3 py-2 text-gray-500 text-xs font-normal">Atualizado em (UTC)</th>
               <th
@@ -431,7 +579,7 @@ const computedRows = computed(() =>
           <tbody>
             <tr
               v-for="row in computedRows"
-              :key="`${row.item_id}__${row.quality}`"
+              :key="`${row.item_id}__${row.quality}__${row.sourceCity}`"
               class="border-t border-gray-800 hover:bg-gray-800/50 transition-colors"
             >
               <td class="px-3 py-2 text-xs text-yellow-300">
@@ -446,23 +594,24 @@ const computedRows = computed(() =>
                 </span>
               </td>
               <td class="px-3 py-2">{{ qualityLabel[row.quality] ?? row.quality }}</td>
+              <td class="px-3 py-2 text-sky-400 text-xs">{{ row.sourceCity }}</td>
               <td class="px-3 py-2 text-sky-400">
-                {{ row.caerleon!.sell_price_min.toLocaleString() }}
+                {{ row.source!.sell_price_min.toLocaleString() }}
               </td>
               <td
                 class="px-3 py-2 text-xs rounded"
-                :class="dateBgClass(row.caerleon!.sell_price_min_date)"
+                :class="dateBgClass(row.source!.sell_price_min_date)"
               >
-                {{ formatDate(row.caerleon!.sell_price_min_date) }}
+                {{ formatDate(row.source!.sell_price_min_date) }}
               </td>
               <td class="px-3 py-2 text-red-400">
-                {{ row.blackMarket!.sell_price_min.toLocaleString() }}
+                {{ row.blackMarket!.buy_price_max.toLocaleString() }}
               </td>
               <td
                 class="px-3 py-2 text-xs rounded"
-                :class="dateBgClass(row.blackMarket!.sell_price_min_date)"
+                :class="dateBgClass(row.blackMarket!.buy_price_max_date)"
               >
-                {{ formatDate(row.blackMarket!.sell_price_min_date) }}
+                {{ formatDate(row.blackMarket!.buy_price_max_date) }}
               </td>
               <td
                 class="px-3 py-2 font-semibold"

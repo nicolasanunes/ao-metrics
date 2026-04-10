@@ -295,8 +295,6 @@ export function useRefineCalculator() {
     subBadge,
     refinedBadge,
     // Focus
-    totalSpecSum,
-    specByTier,
     focusCostBase,
     focusCostPerRefine,
     focusSpecReductionPct,
@@ -328,14 +326,11 @@ export function useRefineCalculator() {
     isBudgetLimited,
     costPerItemWithFocus,
     costPerItemNoFocus,
-    itemsWithFocus,
-    itemsWithoutFocus,
     costPerItem,
     totalCost,
     totalFocus,
     // Nutrition
     nutritionPerAction,
-    nutritionCostPerAction,
     totalNutritionCost,
     nutritionCostPerItem,
     // Profit

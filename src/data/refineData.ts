@@ -233,7 +233,7 @@ export const SUBTIER_COLORS: Record<number, string> = {
   4: 'bg-yellow-600 text-yellow-100',
 }
 
-export function tierLabel(t: number, s: number = 0): string {
+function tierLabel(t: number, s: number = 0): string {
   return s > 0 ? `T${t}.${s}` : `T${t}`
 }
 

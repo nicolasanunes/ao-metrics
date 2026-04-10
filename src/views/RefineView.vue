@@ -63,7 +63,6 @@ const {
   rawReturn,
   subReturn,
   totalReturn,
-  refineActions,
   // Scaled totals
   rawQtyTotal,
   subQtyTotal,
@@ -96,7 +95,7 @@ const {
 
 <template>
   <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
-    <h1 class="text-2xl font-bold mb-1 text-yellow-400">AO Calculadora de Refino</h1>
+    <h1 class="text-2xl font-bold mb-1 text-yellow-400">Calculadora de Refino</h1>
     <p class="text-sm text-gray-500 mb-6">
       Calcule o custo de refinar materiais considerando bônus de cidade, evento diário e foco.
     </p>
@@ -880,21 +879,6 @@ const {
           </div>
         </div>
       </div>
-
-      <!-- Formula note -->
-      <!-- <div class="mt-5 bg-gray-800/50 rounded-lg p-3 text-xs text-gray-500">
-        <p class="font-semibold text-gray-400 mb-1">Como o cálculo funciona</p>
-        <p>
-          <strong class="text-gray-300">Taxa de retorno</strong>: valores fixos conforme a interface
-          do jogo (não dependem de tier, spec ou quantidade). Sem cidade: 15,2% / 23,7% / 29,3%
-          (evento 0/10/20%); com cidade: 36,7% / 43,5% / 47,0%; com foco: +28,7pp / +25,2pp /
-          +23,5pp / +19,2pp / +14,9pp / +12,6pp respectivamente. A spec só reduz o custo de foco em
-          0,5% por nível (50% máx.). <strong class="text-gray-300">Custo líquido</strong> = custo
-          bruto × (1 − RRR). <strong class="text-gray-300">Custo de nutrição por item</strong> =
-          (nutrição do tier × taxa da estação ÷ 100) ÷ yield por refino. O lucro desconta tanto o
-          custo de materiais quanto o custo de nutrição.
-        </p>
-      </div> -->
     </div>
   </div>
 </template>

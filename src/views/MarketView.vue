@@ -231,6 +231,10 @@ function dateBgClass(dateStr: string): string {
 <template>
   <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
     <h1 class="text-2xl font-bold mb-6 text-yellow-400">Mercado do Albion Online</h1>
+    <p class="text-sm text-gray-500 mb-6">
+      Compare os preços dos itens nas cidades selecionadas para encontrar as melhores oportunidades
+      de compra e de venda.
+    </p>
 
     <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- Items -->

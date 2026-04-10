@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useFarmingCalculator } from '@/composables/useFarmingCalculator'
 import {
+  useFarmingCalculator,
   CROP_OPTIONS,
   tierBg,
   tierTextColor,
@@ -51,12 +51,15 @@ const {
   profitMarginPct,
   isSeedSustainable,
   bonusCities,
+  seedsDeficitTotal,
+  restockCostTotal,
+  netProfitAfterRestockTotal,
 } = useFarmingCalculator()
 </script>
 
 <template>
   <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
-    <h1 class="text-2xl font-bold mb-1 text-yellow-400">AO Calculadora de Ilha</h1>
+    <h1 class="text-2xl font-bold mb-1 text-yellow-400">Fazendas da Ilha</h1>
     <p class="text-sm text-gray-500 mb-6">
       Calcule o lucro do plantio de sementes por fazenda, considerando irrigação com foco, bônus de
       cidade e status de premium.
@@ -79,14 +82,6 @@ const {
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700',
             ]"
           >
-            <!-- <span
-              :class="[
-                'text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0',
-                TIER_BADGE_CLASSES[opt.tier] ?? 'bg-gray-600 text-gray-100',
-              ]"
-            >
-              T{{ opt.tier }}
-            </span> -->
             {{ opt.label }}
           </button>
         </div>
@@ -98,13 +93,13 @@ const {
             <div>
               <p class="text-xs text-gray-500 mb-0.5">% retorno sem irrigação</p>
               <p class="font-semibold text-gray-300">
-                {{ (cropData.yieldUnwatered * 100).toFixed(0) }}%
+                {{ (cropData.yieldUnwatered * 100).toFixed(2) }}%
               </p>
             </div>
             <div>
               <p class="text-xs text-gray-500 mb-0.5">% retorno com irrigação</p>
               <p class="font-semibold text-green-400">
-                {{ (cropData.yieldWatered * 100).toFixed(0) }}%
+                {{ (cropData.yieldWatered * 100).toFixed(2) }}%
               </p>
             </div>
           </div>
@@ -234,27 +229,14 @@ const {
         <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Fazenda &amp; Irrigação
         </h2>
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">Número de fazendas</label>
-            <input
-              type="number"
-              v-model.number="plots"
-              min="1"
-              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-            />
-          </div>
-
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">Plantas / fazenda (máx. 9)</label>
-            <input
-              type="number"
-              v-model.number="seedsPerPlot"
-              min="1"
-              max="9"
-              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-            />
-          </div>
+        <div class="mb-4">
+          <label class="text-xs text-gray-500 mb-2 block">Número de fazendas</label>
+          <input
+            type="number"
+            v-model.number="plots"
+            min="1"
+            class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+          />
         </div>
 
         <div class="border-t border-gray-700 pt-4 mb-4">
@@ -432,12 +414,13 @@ const {
               Bônus cidade +10%
             </span>
             <span
+              v-if="seedsWatered > 0"
               class="bg-blue-400/20 text-blue-300 px-2 py-1 rounded-full border border-blue-400/30"
             >
               {{ seedsWatered }}/{{ 9 * plots }} irrigadas
             </span>
             <span
-              v-if="focusEfficiency > 0"
+              v-if="seedsWatered > 0"
               class="bg-blue-900/40 text-blue-300 px-2 py-1 rounded-full border border-blue-700/40"
             >
               Foco
@@ -552,7 +535,7 @@ const {
             class="text-2xl font-bold"
             :class="isSeedSustainable ? 'text-green-400' : 'text-red-400'"
           >
-            ~{{ seedsBack.toFixed(1) }}
+            ~{{ seedsBack.toFixed(2) }}
           </p>
           <p class="text-xs text-gray-600 mt-1">de 9 plantadas</p>
         </div>
@@ -600,7 +583,7 @@ const {
             class="text-xl font-bold"
             :class="isSeedSustainable ? 'text-green-400' : 'text-red-400'"
           >
-            ~{{ seedsBackTotal.toFixed(1) }}
+            ~{{ seedsBackTotal.toFixed(2) }}
           </p>
           <p class="text-xs text-gray-600 mt-1">de {{ 9 * plots }} plantadas</p>
         </div>
@@ -805,23 +788,52 @@ const {
           <div>
             <p class="text-xs text-gray-500 mb-0.5">% retorno irrigado</p>
             <p class="text-gray-300 font-semibold">
-              {{ (cropData.yieldWatered * 100).toFixed(0) }}%
+              {{ (cropData.yieldWatered * 100).toFixed(2) }}%
             </p>
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-0.5">% retorno sem irrigação</p>
             <p class="text-gray-300 font-semibold">
-              {{ (cropData.yieldUnwatered * 100).toFixed(0) }}%
+              {{ (cropData.yieldUnwatered * 100).toFixed(2) }}%
             </p>
           </div>
         </div>
         <p v-if="!isSeedSustainable" class="text-xs text-red-300 mt-2">
           ⚠️ Com {{ seedsWatered }} semente(s) irrigada(s) e a combinação atual de % retorno, você
-          perde sementes a cada ciclo. Considere irrigar mais sementes ou verificar o % retorno da
-          cultura selecionada.
+          perde sementes a cada ciclo. Considere irrigar mais sementes ou aumentar a especialização
+          da cultura selecionada.
         </p>
         <p v-else class="text-xs text-green-300 mt-2">
           ✓ Você recupera sementes suficientes para manter o ciclo de produção.
+        </p>
+
+        <!-- Restock cost block (only when unsustainable and priceSeed is set) -->
+        <div
+          v-if="!isSeedSustainable && priceSeed > 0"
+          class="mt-4 pt-4 border-t border-red-700/40"
+        >
+          <p class="text-xs font-semibold text-red-300 uppercase tracking-wider mb-3">
+            Custo de Reposição de Sementes
+          </p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Déficit total ({{ plots }} fazendas)</p>
+              <p class="font-semibold text-red-400">~{{ seedsDeficitTotal }} semente(s)</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Gasto p/ reposição (total)</p>
+              <p class="font-semibold text-orange-400">{{ fmt(restockCostTotal) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Lucro após reposição (total)</p>
+              <p class="font-semibold" :class="profitColorClass(netProfitAfterRestockTotal)">
+                {{ fmt(netProfitAfterRestockTotal) }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <p v-else-if="!isSeedSustainable && priceSeed === 0" class="text-xs text-gray-500 mt-3">
+          Informe o preço da semente para calcular o custo de reposição.
         </p>
       </div>
 

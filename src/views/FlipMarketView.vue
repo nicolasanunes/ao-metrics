@@ -102,6 +102,33 @@ const CONCURRENCY = 5
 
 let currentAbortController: AbortController | null = null
 
+// Select/deselect all helpers
+const allCitiesSelected = computed(() => selectedCities.value.length === cityOptions.length)
+function toggleAllCities() {
+  selectedCities.value = allCitiesSelected.value ? [] : cityOptions.map((c) => c.value)
+}
+
+const allQualitiesSelected = computed(
+  () => selectedQualities.value.length === qualityOptions.length,
+)
+function toggleAllQualities() {
+  selectedQualities.value = allQualitiesSelected.value ? [] : qualityOptions.map((q) => q.value)
+}
+
+const allTiersSelected = computed(() => selectedTiers.value.length === tierOptions.length)
+function toggleAllTiers() {
+  selectedTiers.value = allTiersSelected.value ? [] : tierOptions.map((t) => t.value)
+}
+
+const allEnchantmentsSelected = computed(
+  () => selectedEnchantments.value.length === enchantmentOptions.length,
+)
+function toggleAllEnchantments() {
+  selectedEnchantments.value = allEnchantmentsSelected.value
+    ? []
+    : enchantmentOptions.map((e) => e.value)
+}
+
 async function search() {
   const ids = filteredIds.value
   if (!ids.length || !selectedQualities.value.length || !selectedCities.value.length) return
@@ -300,6 +327,10 @@ const computedRows = computed(() =>
 <template>
   <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
     <h1 class="text-2xl font-bold mb-6 text-yellow-400">Flip de Mercado</h1>
+    <p class="text-sm text-gray-500 mb-6">
+      Compare os preços de venda mínima dos itens nas cidades selecionadas com os preços de compra
+      máxima do Mercado Negro para encontrar oportunidades de flip.
+    </p>
 
     <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- All equippable items info -->
@@ -349,9 +380,17 @@ const computedRows = computed(() =>
 
       <!-- Source Cities -->
       <div class="bg-gray-900 rounded-xl p-4 flex-1">
-        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          Cidade de Compra
-        </h2>
+        <div class="items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Cidade de Compra
+          </h2>
+          <button
+            @click="toggleAllCities"
+            class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
+          >
+            {{ allCitiesSelected ? 'Desmarcar todas' : 'Selecionar todas' }}
+          </button>
+        </div>
         <label
           v-for="c in cityOptions"
           :key="c.value"
@@ -390,9 +429,15 @@ const computedRows = computed(() =>
 
       <!-- Quality -->
       <div class="bg-gray-900 rounded-xl p-4 flex-1">
-        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          Qualidades
-        </h2>
+        <div class="items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Qualidades</h2>
+          <button
+            @click="toggleAllQualities"
+            class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
+          >
+            {{ allQualitiesSelected ? 'Desmarcar todas' : 'Selecionar todas' }}
+          </button>
+        </div>
         <label
           v-for="q in qualityOptions"
           :key="q.value"
@@ -427,7 +472,15 @@ const computedRows = computed(() =>
 
       <!-- Tier -->
       <div class="bg-gray-900 rounded-xl p-4 flex-1">
-        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Tier</h2>
+        <div class="items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Tier</h2>
+          <button
+            @click="toggleAllTiers"
+            class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
+          >
+            {{ allTiersSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
+          </button>
+        </div>
         <div class="flex-1 flex-wrap gap-1 mb-1">
           <label
             v-for="t in tierOptions"
@@ -464,9 +517,15 @@ const computedRows = computed(() =>
 
       <!-- Enchantment -->
       <div class="bg-gray-900 rounded-xl p-4 flex-1">
-        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          Encantamento
-        </h2>
+        <div class="items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Encantamento</h2>
+          <button
+            @click="toggleAllEnchantments"
+            class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
+          >
+            {{ allEnchantmentsSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
+          </button>
+        </div>
         <label
           v-for="e in enchantmentOptions"
           :key="e.value"
@@ -635,7 +694,8 @@ const computedRows = computed(() =>
       v-if="!loading && !flipRows.length && !error && results.length === 0"
       class="mt-10 text-center text-gray-600 text-sm"
     >
-      Selecione ao menos uma qualidade e clique em "Buscar Flips".
+      Selecione ao menos uma cidade, uma qualidade, um tier, um encantamento e clique em "Buscar
+      flips".
     </div>
 
     <div

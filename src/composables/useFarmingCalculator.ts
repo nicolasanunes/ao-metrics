@@ -152,7 +152,7 @@ export function marginBgClass(pct: number | null): string {
 export function useFarmingCalculator() {
   // ── State ──────────────────────────────────────────────────────────────
 
-  const seedsPerPlot = ref(9)
+  const seedsPerPlot = 9
   const crop = ref<CropKey>('wheat')
   const specFarming = ref(100) // 0–100
   const specCultura = ref(0) // 0–100
@@ -167,22 +167,15 @@ export function useFarmingCalculator() {
 
   // Clamp seedsWatered when plots changes
   watch(plots, (newPlots) => {
-    const max = newPlots * seedsPerPlot.value
+    const max = newPlots * seedsPerPlot
     if (seedsWatered.value > max) seedsWatered.value = max
     if (newPlots < 1) plots.value = 1
   })
 
   watch(seedsWatered, (v) => {
-    const max = plots.value * seedsPerPlot.value
+    const max = plots.value * seedsPerPlot
     if (v > max) seedsWatered.value = max
     if (v < 0) seedsWatered.value = 0
-  })
-
-  watch(seedsPerPlot, (v) => {
-    if (v > 9) seedsPerPlot.value = 9
-    if (v < 1) seedsPerPlot.value = 1
-    const max = plots.value * seedsPerPlot.value
-    if (seedsWatered.value > max) seedsWatered.value = max
   })
 
   watch(specFarming, (v) => {
@@ -213,8 +206,8 @@ export function useFarmingCalculator() {
     plots.value > 0 ? seedsWatered.value / plots.value : 0,
   )
   /** Total unwatered seeds across all plots */
-  const seedsUnwatered = computed(() => seedsPerPlot.value * plots.value - seedsWatered.value)
-  const seedsUnwateredPerPlot = computed(() => seedsPerPlot.value - seedsWateredPerPlot.value)
+  const seedsUnwatered = computed(() => seedsPerPlot * plots.value - seedsWatered.value)
+  const seedsUnwateredPerPlot = computed(() => seedsPerPlot - seedsWateredPerPlot.value)
   const cropYieldAvg = computed(() => (premium.value ? 9 : 4.5))
   const cityMult = computed(() => (cityBonus.value ? 1.1 : 1.0))
   const earthwormDrops = computed(() => (premium.value ? 2 : 1))
@@ -227,13 +220,13 @@ export function useFarmingCalculator() {
       seedsUnwateredPerPlot.value * cropData.value.yieldUnwatered,
   )
 
-  const cropsHarvested = computed(() => seedsPerPlot.value * cropYieldAvg.value * cityMult.value)
+  const cropsHarvested = computed(() => seedsPerPlot * cropYieldAvg.value * cityMult.value)
 
-  const earthworms = computed(() => seedsPerPlot.value * 0.1 * earthwormDrops.value)
+  const earthworms = computed(() => seedsPerPlot * 0.1 * earthwormDrops.value)
 
   const focusThisCycle = computed(() => seedsWateredPerPlot.value * focusPerSeed.value)
 
-  const totalFame = computed(() => seedsPerPlot.value * famePerHarvest.value)
+  const totalFame = computed(() => seedsPerPlot * famePerHarvest.value)
 
   // ── Per-plot financials ────────────────────────────────────────────────
 
@@ -244,7 +237,7 @@ export function useFarmingCalculator() {
       earthworms.value * priceEarthworm.value,
   )
 
-  const cost = computed(() => seedsPerPlot.value * priceSeed.value)
+  const cost = computed(() => seedsPerPlot * priceSeed.value)
   const netProfit = computed(() => revenue.value - cost.value)
 
   // ── Scaled by number of plots ──────────────────────────────────────────
@@ -268,10 +261,32 @@ export function useFarmingCalculator() {
   /**
    * Returns whether the player gets at least as many seeds back as planted.
    */
-  const isSeedSustainable = computed(() => seedsBack.value >= seedsPerPlot.value)
+  const isSeedSustainable = computed(() => seedsBack.value >= seedsPerPlot)
 
   /** Cities that grant +10% bonus for the currently selected crop */
   const bonusCities = computed(() => CROP_CITY_BONUS[crop.value])
+
+  // ── Restock cost (when not sustainable) ───────────────────────────────
+
+  /** Seeds missing per plot per cycle (integer — floor of seedsBack) */
+  const seedsDeficit = computed(() => Math.max(0, seedsPerPlot - Math.round(seedsBack.value)))
+
+  /** Seeds missing across all plots (integer — floor of seedsBackTotal) */
+  const seedsDeficitTotal = computed(() =>
+    Math.max(0, seedsPerPlot * plots.value - Math.round(seedsBackTotal.value)),
+  )
+
+  /** Cost to buy deficit seeds per plot */
+  const restockCost = computed(() => seedsDeficit.value * priceSeed.value)
+
+  /** Total restock cost across all plots */
+  const restockCostTotal = computed(() => seedsDeficitTotal.value * priceSeed.value)
+
+  /** Net profit per plot after buying deficit seeds */
+  const netProfitAfterRestock = computed(() => netProfit.value - restockCost.value)
+
+  /** Net profit total after buying deficit seeds */
+  const netProfitAfterRestockTotal = computed(() => netProfitTotal.value - restockCostTotal.value)
 
   return {
     // state
@@ -296,7 +311,6 @@ export function useFarmingCalculator() {
     cropData,
     seedsUnwatered,
     cropYieldAvg,
-    cityMult,
     seedsBack,
     cropsHarvested,
     earthworms,
@@ -315,5 +329,9 @@ export function useFarmingCalculator() {
     profitMarginPct,
     isSeedSustainable,
     bonusCities,
+    // restock
+    seedsDeficitTotal,
+    restockCostTotal,
+    netProfitAfterRestockTotal,
   }
 }

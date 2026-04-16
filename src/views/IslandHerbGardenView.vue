@@ -13,7 +13,6 @@ import {
 const {
   // State
   herb,
-  seedsPerPlot,
   specFarming,
   specCultura,
   seedsWatered,
@@ -51,12 +50,15 @@ const {
   profitMarginPct,
   isSeedSustainable,
   bonusCities,
+  seedsDeficitTotal,
+  restockCostTotal,
+  netProfitAfterRestockTotal,
 } = useHerbCalculator()
 </script>
 
 <template>
   <div class="bg-gray-950/90 text-gray-100 rounded-lg p-6">
-    <h1 class="text-2xl font-bold mb-1 text-yellow-400">AO Calculadora de Horta de Ervas</h1>
+    <h1 class="text-2xl font-bold mb-1 text-yellow-400">Hortas da Ilha</h1>
     <p class="text-sm text-gray-500 mb-6">
       Calcule o lucro do cultivo de ervas por horta, considerando irrigação com foco, bônus de
       cidade e status de premium.
@@ -90,13 +92,13 @@ const {
             <div>
               <p class="text-xs text-gray-500 mb-0.5">% retorno sem irrigação</p>
               <p class="font-semibold text-gray-300">
-                {{ (herbData.yieldUnwatered * 100).toFixed(0) }}%
+                {{ (herbData.yieldUnwatered * 100).toFixed(2) }}%
               </p>
             </div>
             <div>
               <p class="text-xs text-gray-500 mb-0.5">% retorno com irrigação</p>
               <p class="font-semibold text-green-400">
-                {{ (herbData.yieldWatered * 100).toFixed(0) }}%
+                {{ (herbData.yieldWatered * 100).toFixed(2) }}%
               </p>
             </div>
           </div>
@@ -226,38 +228,25 @@ const {
           Hortas &amp; Irrigação
         </h2>
 
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">Número de hortas</label>
-            <input
-              type="number"
-              v-model.number="plots"
-              min="1"
-              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-            />
-          </div>
-
-          <div>
-            <label class="text-xs text-gray-500 mb-2 block">Ervas / horta (máx. 9)</label>
-            <input
-              type="number"
-              v-model.number="seedsPerPlot"
-              min="1"
-              max="9"
-              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-            />
-          </div>
+        <div class="mb-4">
+          <label class="text-xs text-gray-500 mb-2 block">Número de hortas</label>
+          <input
+            type="number"
+            v-model.number="plots"
+            min="1"
+            class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+          />
         </div>
 
         <div class="border-t border-gray-700 pt-4 mb-4">
           <label class="text-xs text-gray-500 mb-2 block"
-            >Total de sementes irrigadas (máx. {{ seedsPerPlot * plots }})</label
+            >Total de sementes irrigadas (máx. {{ 9 * plots }})</label
           >
           <input
             type="number"
             v-model.number="seedsWatered"
             min="0"
-            :max="seedsPerPlot * plots"
+            :max="9 * plots"
             class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
           />
           <div class="flex items-center justify-between text-xs text-gray-500 mt-1.5">
@@ -272,15 +261,11 @@ const {
           <div class="space-y-1 text-xs">
             <div class="flex justify-between">
               <span class="text-gray-500">Sementes plantadas</span>
-              <span class="text-gray-300 font-semibold"
-                >{{ seedsPerPlot }} × {{ plots }} = {{ seedsPerPlot * plots }}</span
-              >
+              <span class="text-gray-300 font-semibold">9 × {{ plots }} = {{ 9 * plots }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Colheita esperada / horta</span>
-              <span class="text-gray-300 font-semibold"
-                >~{{ herbYieldAvg.toFixed(1) }} × {{ seedsPerPlot }}</span
-              >
+              <span class="text-gray-300 font-semibold">~{{ herbYieldAvg.toFixed(1) }} × 9</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-500">Tempo de crescimento</span>
@@ -425,14 +410,15 @@ const {
             </span>
             <span
               class="bg-blue-400/20 text-blue-300 px-2 py-1 rounded-full border border-blue-400/30"
+              v-if="seedsWatered > 0"
             >
               {{ seedsWatered }}/{{ 9 * plots }} irrigadas
             </span>
             <span
-              v-if="focusEfficiency > 0"
+              v-if="seedsWatered > 0"
               class="bg-blue-900/40 text-blue-300 px-2 py-1 rounded-full border border-blue-700/40"
             >
-              Foco −{{ focusReductionPct.toFixed(1) }}%
+              Foco
             </span>
             <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded-full font-semibold">
               {{ plots }} horta{{ plots !== 1 ? 's' : '' }}
@@ -544,7 +530,7 @@ const {
             class="text-2xl font-bold"
             :class="isSeedSustainable ? 'text-green-400' : 'text-red-400'"
           >
-            ~{{ seedsBack.toFixed(1) }}
+            ~{{ seedsBack.toFixed(2) }}
           </p>
           <p class="text-xs text-gray-600 mt-1">de 9 plantadas</p>
         </div>
@@ -553,11 +539,11 @@ const {
       <!-- Multi-plot cards (visible when plots > 1) -->
       <div v-if="plots > 1" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="bg-blue-900/20 border border-blue-700/40 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Receita total / {{ plots }} jardins</p>
+          <p class="text-xs text-gray-400 mb-1">Receita total / {{ plots }} hortas</p>
           <p class="text-xl font-bold text-yellow-300">{{ fmt(revenueTotal) }}</p>
         </div>
         <div class="bg-red-900/20 border border-red-700/40 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Custo total / {{ plots }} jardins</p>
+          <p class="text-xs text-gray-400 mb-1">Custo total / {{ plots }} hortas</p>
           <p class="text-xl font-bold text-red-400">{{ fmt(costTotal) }}</p>
         </div>
         <div
@@ -568,13 +554,13 @@ const {
               : 'bg-red-900/20 border-red-700/40',
           ]"
         >
-          <p class="text-xs text-gray-400 mb-1">Lucro líquido total / {{ plots }} jardins</p>
+          <p class="text-xs text-gray-400 mb-1">Lucro líquido total / {{ plots }} hortas</p>
           <p class="text-xl font-bold" :class="profitColorClass(netProfitTotal)">
             {{ fmt(netProfitTotal) }}
           </p>
         </div>
         <div class="bg-blue-900/20 border border-blue-700/40 rounded-xl p-4 text-center">
-          <p class="text-xs text-gray-400 mb-1">Foco total / {{ plots }} jardins</p>
+          <p class="text-xs text-gray-400 mb-1">Foco total / {{ plots }} hortas</p>
           <p class="text-xl font-bold text-blue-400">
             {{ seedsWatered > 0 ? fmt(focusTotal) : '—' }}
           </p>
@@ -587,12 +573,12 @@ const {
               : 'bg-red-900/20 border-red-700/40',
           ]"
         >
-          <p class="text-xs text-gray-400 mb-1">Sementes retornadas / {{ plots }} jardins</p>
+          <p class="text-xs text-gray-400 mb-1">Sementes retornadas / {{ plots }} hortas</p>
           <p
             class="text-xl font-bold"
             :class="isSeedSustainable ? 'text-green-400' : 'text-red-400'"
           >
-            ~{{ seedsBackTotal.toFixed(1) }}
+            ~{{ seedsBackTotal.toFixed(2) }}
           </p>
           <p class="text-xs text-gray-600 mt-1">de {{ 9 * plots }} plantadas</p>
         </div>
@@ -797,13 +783,13 @@ const {
           <div>
             <p class="text-xs text-gray-500 mb-0.5">% retorno irrigado</p>
             <p class="text-gray-300 font-semibold">
-              {{ (herbData.yieldWatered * 100).toFixed(0) }}%
+              {{ (herbData.yieldWatered * 100).toFixed(2) }}%
             </p>
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-0.5">% retorno sem irrigação</p>
             <p class="text-gray-300 font-semibold">
-              {{ (herbData.yieldUnwatered * 100).toFixed(0) }}%
+              {{ (herbData.yieldUnwatered * 100).toFixed(2) }}%
             </p>
           </div>
         </div>
@@ -815,12 +801,41 @@ const {
         <p v-else class="text-xs text-green-300 mt-2">
           ✓ Você recupera sementes suficientes para manter o ciclo de produção.
         </p>
+
+        <!-- Restock cost block (only when unsustainable and priceSeed is set) -->
+        <div
+          v-if="!isSeedSustainable && priceSeed > 0"
+          class="mt-4 pt-4 border-t border-red-700/40"
+        >
+          <p class="text-xs font-semibold text-red-300 uppercase tracking-wider mb-3">
+            Custo de Reposição de Sementes
+          </p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Déficit total ({{ plots }} hortas)</p>
+              <p class="font-semibold text-red-400">~{{ seedsDeficitTotal }} semente(s)</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Gasto p/ reposição (total)</p>
+              <p class="font-semibold text-orange-400">{{ fmt(restockCostTotal) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Lucro após reposição (total)</p>
+              <p class="font-semibold" :class="profitColorClass(netProfitAfterRestockTotal)">
+                {{ fmt(netProfitAfterRestockTotal) }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <p v-else-if="!isSeedSustainable && priceSeed === 0" class="text-xs text-gray-500 mt-3">
+          Informe o preço da semente para calcular o custo de reposição.
+        </p>
       </div>
 
       <!-- Profitability section -->
       <div class="border-t border-gray-700 pt-5">
         <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          Lucratividade ({{ plots > 1 ? plots + ' jardins' : '1 jardim' }})
+          Lucratividade ({{ plots > 1 ? plots + ' hortas' : '1 horta' }})
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-gray-800 rounded-xl p-3 text-center">

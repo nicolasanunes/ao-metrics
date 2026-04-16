@@ -97,7 +97,7 @@ export const HERB_OPTIONS: Array<{ value: HerbKey; label: string; tier: number }
 export function useHerbCalculator() {
   // ── State ──────────────────────────────────────────────────────────────
 
-  const seedsPerPlot = ref(9)
+  const seedsPerPlot = 9
   const herb = ref<HerbKey>('confrei')
   const specFarming = ref(100) // 0–100
   const specCultura = ref(0) // 0–100
@@ -112,22 +112,15 @@ export function useHerbCalculator() {
 
   // Clamp seedsWatered when plots changes
   watch(plots, (newPlots) => {
-    const max = newPlots * seedsPerPlot.value
+    const max = newPlots * seedsPerPlot
     if (seedsWatered.value > max) seedsWatered.value = max
     if (newPlots < 1) plots.value = 1
   })
 
   watch(seedsWatered, (v) => {
-    const max = plots.value * seedsPerPlot.value
+    const max = plots.value * seedsPerPlot
     if (v > max) seedsWatered.value = max
     if (v < 0) seedsWatered.value = 0
-  })
-
-  watch(seedsPerPlot, (v) => {
-    if (v > 9) seedsPerPlot.value = 9
-    if (v < 1) seedsPerPlot.value = 1
-    const max = plots.value * seedsPerPlot.value
-    if (seedsWatered.value > max) seedsWatered.value = max
   })
 
   watch(specFarming, (v) => {
@@ -152,8 +145,8 @@ export function useHerbCalculator() {
   const seedsWateredPerPlot = computed(() =>
     plots.value > 0 ? seedsWatered.value / plots.value : 0,
   )
-  const seedsUnwatered = computed(() => seedsPerPlot.value * plots.value - seedsWatered.value)
-  const seedsUnwateredPerPlot = computed(() => seedsPerPlot.value - seedsWateredPerPlot.value)
+  const seedsUnwatered = computed(() => seedsPerPlot * plots.value - seedsWatered.value)
+  const seedsUnwateredPerPlot = computed(() => seedsPerPlot - seedsWateredPerPlot.value)
   const herbYieldAvg = computed(() => (premium.value ? 9 : 4.5))
   const cityMult = computed(() => (cityBonus.value ? 1.1 : 1.0))
   const earthwormDrops = computed(() => (premium.value ? 2 : 1))
@@ -165,10 +158,10 @@ export function useHerbCalculator() {
       seedsUnwateredPerPlot.value * herbData.value.yieldUnwatered,
   )
 
-  const herbsHarvested = computed(() => seedsPerPlot.value * herbYieldAvg.value * cityMult.value)
-  const earthworms = computed(() => seedsPerPlot.value * 0.1 * earthwormDrops.value)
+  const herbsHarvested = computed(() => seedsPerPlot * herbYieldAvg.value * cityMult.value)
+  const earthworms = computed(() => seedsPerPlot * 0.1 * earthwormDrops.value)
   const focusThisCycle = computed(() => seedsWateredPerPlot.value * focusPerSeed.value)
-  const totalFame = computed(() => seedsPerPlot.value * famePerHarvest.value)
+  const totalFame = computed(() => seedsPerPlot * famePerHarvest.value)
 
   // ── Per-plot financials ────────────────────────────────────────────────
 
@@ -179,7 +172,7 @@ export function useHerbCalculator() {
       earthworms.value * priceEarthworm.value,
   )
 
-  const cost = computed(() => seedsPerPlot.value * priceSeed.value)
+  const cost = computed(() => seedsPerPlot * priceSeed.value)
   const netProfit = computed(() => revenue.value - cost.value)
 
   // ── Scaled by number of plots ──────────────────────────────────────────
@@ -201,14 +194,19 @@ export function useHerbCalculator() {
 
   // ── Seed sustainability indicator ──────────────────────────────────────
 
-  const isSeedSustainable = computed(() => seedsBack.value >= seedsPerPlot.value)
+  const isSeedSustainable = computed(() => seedsBack.value >= seedsPerPlot)
+
+  const seedsDeficitTotal = computed(() =>
+    Math.max(0, seedsPerPlot * plots.value - Math.round(seedsBackTotal.value)),
+  )
+  const restockCostTotal = computed(() => seedsDeficitTotal.value * priceSeed.value)
+  const netProfitAfterRestockTotal = computed(() => netProfitTotal.value - restockCostTotal.value)
 
   const bonusCities = computed(() => HERB_CITY_BONUS[herb.value])
 
   return {
     // state
     herb,
-    seedsPerPlot,
     specFarming,
     specCultura,
     seedsWatered,
@@ -246,5 +244,8 @@ export function useHerbCalculator() {
     profitMarginPct,
     isSeedSustainable,
     bonusCities,
+    seedsDeficitTotal,
+    restockCostTotal,
+    netProfitAfterRestockTotal,
   }
 }

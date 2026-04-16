@@ -2,7 +2,7 @@ import { ref, computed, watch } from 'vue'
 
 // ── Types & constants ──────────────────────────────────────────────────────
 
-export type PastureMode = 'production' | 'riding'
+export type PastureMode = 'production' | 'riding' | 'secondary'
 
 // ── Production animals ─────────────────────────────────────────────────────
 
@@ -108,6 +108,14 @@ export const PRODUCTION_OPTIONS: Array<{ value: ProductionKey; label: string; ti
   { value: 'cordeiro', label: 'Cordeiro → Ovelhas', tier: 6 },
   { value: 'leitao', label: 'Leitão → Porcos', tier: 7 },
   { value: 'novilhoCorte', label: 'Novilho → Vacas', tier: 8 },
+]
+
+export const SECONDARY_OPTIONS: Array<{ value: ProductionKey; label: string; tier: number }> = [
+  { value: 'pinto', label: 'Galinhas → Ovos de Galinha', tier: 3 },
+  { value: 'cabrito', label: 'Cabras → Leite de Cabra', tier: 4 },
+  { value: 'gansinho', label: 'Gansos → Ovos de Ganso', tier: 5 },
+  { value: 'cordeiro', label: 'Ovelhas → Leite de Ovelha', tier: 6 },
+  { value: 'novilhoCorte', label: 'Vacas → Leite de Vaca', tier: 8 },
 ]
 
 // ── Riding animals ──────────────────────────────────────────────────────────
@@ -341,7 +349,7 @@ export function usePastureCalculator() {
   const specAnimal = ref(0) // 0–100 (specific animal)
   const premium = ref(false)
   const pastures = ref(1)
-  const animalsPerPasture = ref(9)
+  const animalsPerPasture = ANIMALS_PER_PASTURE
 
   // ── Focus (shared) ─────────────────────────────────────────────────────
 
@@ -362,16 +370,11 @@ export function usePastureCalculator() {
   watch(pastures, (v) => {
     if (v < 1) pastures.value = 1
   })
-  watch(animalsPerPasture, (v) => {
-    if (v > ANIMALS_PER_PASTURE) animalsPerPasture.value = ANIMALS_PER_PASTURE
-    if (v < 1) animalsPerPasture.value = 1
-  })
 
   // ── PRODUCTION mode ────────────────────────────────────────────────────
 
   const productionAnimal = ref<ProductionKey>('pinto')
   const animalsWithFocus = ref(0) // total across all pastures
-  const useSecondary = ref(false) // use secondary production instead of selling adult
   const favFoodActive = ref(false) // feeding favorite food
 
   // Prices
@@ -379,7 +382,6 @@ export function usePastureCalculator() {
   const priceAdult = ref(0) // adult/grown animal price
   const priceFood = ref(0) // food item price
   const foodPerAnimal = ref(0) // food items needed per animal per cycle (user-defined)
-  const priceSecondary = ref(0) // secondary product price
 
   watch(pastures, (newP) => {
     const max = newP * ANIMALS_PER_PASTURE
@@ -392,14 +394,14 @@ export function usePastureCalculator() {
   })
 
   const productionData = computed(() => PRODUCTION_ANIMALS[productionAnimal.value])
-  const totalAnimals = computed(() => animalsPerPasture.value * pastures.value)
+  const totalAnimals = computed(() => animalsPerPasture * pastures.value)
   const animalsUnfocused = computed(() => totalAnimals.value - animalsWithFocus.value)
 
   const animalsWithFocusPerPasture = computed(() =>
     pastures.value > 0 ? animalsWithFocus.value / pastures.value : 0,
   )
   const animalsUnfocusedPerPasture = computed(
-    () => animalsPerPasture.value - animalsWithFocusPerPasture.value,
+    () => animalsPerPasture - animalsWithFocusPerPasture.value,
   )
 
   // Expected adult animals per pasture
@@ -410,27 +412,13 @@ export function usePastureCalculator() {
   )
   const adultsTotal = computed(() => adultsPerPasture.value * pastures.value)
 
-  // Secondary production: adults → secondary products
-  const secondaryPerPasture = computed(() =>
-    useSecondary.value && productionData.value.hasSecondary
-      ? adultsPerPasture.value * productionData.value.secondaryYieldAvg
-      : 0,
-  )
-  const secondaryTotal = computed(() => secondaryPerPasture.value * pastures.value)
-
   // Food cost per pasture (with favorite food discount)
   const effectiveFoodMultiplier = computed(() => (favFoodActive.value ? 0.5 : 1.0))
   const totalFoodPerAnimalCycle = computed(
     () => foodPerAnimal.value * effectiveFoodMultiplier.value,
   )
-  // In secondary production mode, animals are fed twice (young→adult, adult→secondary)
-  const foodCyclesPerAnimal = computed(() => (useSecondary.value ? 2 : 1))
   const foodCostPerPasture = computed(
-    () =>
-      animalsPerPasture.value *
-      totalFoodPerAnimalCycle.value *
-      foodCyclesPerAnimal.value *
-      priceFood.value,
+    () => animalsPerPasture * totalFoodPerAnimalCycle.value * priceFood.value,
   )
   const foodCostTotal = computed(() => foodCostPerPasture.value * pastures.value)
 
@@ -441,16 +429,13 @@ export function usePastureCalculator() {
   const focusProdTotal = computed(() => focusProdPerPasture.value * pastures.value)
 
   // Revenue per pasture
-  const revenueProdPerPasture = computed(() => {
-    if (useSecondary.value && productionData.value.hasSecondary) {
-      return secondaryPerPasture.value * priceSecondary.value
-    }
-    return animalsPerPasture.value * priceAdult.value + adultsPerPasture.value * priceYoung.value
-  })
+  const revenueProdPerPasture = computed(
+    () => animalsPerPasture * priceAdult.value + adultsPerPasture.value * priceYoung.value,
+  )
 
   // Cost per pasture (young animals + food)
   const costProdPerPasture = computed(
-    () => animalsPerPasture.value * priceYoung.value + foodCostPerPasture.value,
+    () => animalsPerPasture * priceYoung.value + foodCostPerPasture.value,
   )
   const netProfitProdPerPasture = computed(
     () => revenueProdPerPasture.value - costProdPerPasture.value,
@@ -465,7 +450,7 @@ export function usePastureCalculator() {
     return (netProfitProdPerPasture.value / revenueProdPerPasture.value) * 100
   })
 
-  const isProductionSustainable = computed(() => adultsPerPasture.value >= animalsPerPasture.value)
+  const isProductionSustainable = computed(() => adultsPerPasture.value >= animalsPerPasture)
 
   // Growth time display for production
   const growthHoursProd = computed(() => (premium.value ? 22 : 44))
@@ -496,7 +481,7 @@ export function usePastureCalculator() {
     pastures.value > 0 ? ridingAnimalsWithFocus.value / pastures.value : 0,
   )
   const ridingWithoutFocusPerPasture = computed(
-    () => animalsPerPasture.value - ridingWithFocusPerPasture.value,
+    () => animalsPerPasture - ridingWithFocusPerPasture.value,
   )
 
   // Expected foals per pasture (each animal × maxNurtures × yieldPerNurture)
@@ -523,7 +508,7 @@ export function usePastureCalculator() {
     () => ridingData.value.maxNurtures * ridingData.value.foodPer24h,
   )
   const foodCostRidingPerPasture = computed(
-    () => animalsPerPasture.value * foodPerAnimalRiding.value * priceRidingFood.value,
+    () => animalsPerPasture * foodPerAnimalRiding.value * priceRidingFood.value,
   )
   const foodCostRidingTotal = computed(() => foodCostRidingPerPasture.value * pastures.value)
 
@@ -540,7 +525,7 @@ export function usePastureCalculator() {
 
   // Cost per pasture (input animals + food)
   const costRidingPerPasture = computed(
-    () => animalsPerPasture.value * priceRidingYoung.value + foodCostRidingPerPasture.value,
+    () => animalsPerPasture * priceRidingYoung.value + foodCostRidingPerPasture.value,
   )
   const netProfitRidingPerPasture = computed(
     () => revenueRidingPerPasture.value - costRidingPerPasture.value,
@@ -560,6 +545,56 @@ export function usePastureCalculator() {
     premium.value ? ridingData.value.growthHoursBase / 2 : ridingData.value.growthHoursBase,
   )
 
+  // ── SECONDARY mode ────────────────────────────────────────────────────────
+
+  // Adult animal that produces secondary items (milk, eggs, etc.)
+  const secondaryAnimal = ref<ProductionKey>('pinto')
+  const priceSecondaryAdult = ref(0) // cost of adult animal (initial investment)
+  const priceSecondaryProduct = ref(0) // revenue per secondary item
+  const priceSecondaryFood = ref(0) // food cost per item
+  const favFoodActiveSecondary = ref(false)
+
+  const secondaryProductionData = computed(() => PRODUCTION_ANIMALS[secondaryAnimal.value])
+
+  // 18 food items per animal per cycle (9 with favourite food)
+  const secondaryFoodPerAnimal = computed(() => (favFoodActiveSecondary.value ? 9 : 18))
+
+  // 9 adults/pasture × secondaryYieldAvg items/adult; premium doubles yield
+  const secondaryItemsPerPasture = computed(
+    () =>
+      animalsPerPasture * secondaryProductionData.value.secondaryYieldAvg * (premium.value ? 2 : 1),
+  )
+  const secondaryItemsTotal = computed(() => secondaryItemsPerPasture.value * pastures.value)
+
+  // Per-cycle food cost (adults are returned — food is the only recurring cost)
+  const secondaryFoodCostPerPasture = computed(
+    () => animalsPerPasture * secondaryFoodPerAnimal.value * priceSecondaryFood.value,
+  )
+  const secondaryFoodCostTotal = computed(() => secondaryFoodCostPerPasture.value * pastures.value)
+
+  const revenueSecondaryPerPasture = computed(
+    () => secondaryItemsPerPasture.value * priceSecondaryProduct.value,
+  )
+  const revenueSecondaryTotal = computed(() => revenueSecondaryPerPasture.value * pastures.value)
+
+  // Cost per cycle = adult animals + food (animals are consumed, not returned)
+  const costSecondaryPerPasture = computed(
+    () => animalsPerPasture * priceSecondaryAdult.value + secondaryFoodCostPerPasture.value,
+  )
+  const costSecondaryTotal = computed(() => costSecondaryPerPasture.value * pastures.value)
+
+  const netProfitSecondaryPerPasture = computed(
+    () => revenueSecondaryPerPasture.value - costSecondaryPerPasture.value,
+  )
+  const netProfitSecondaryTotal = computed(
+    () => netProfitSecondaryPerPasture.value * pastures.value,
+  )
+
+  const profitMarginSecondary = computed<number | null>(() => {
+    if (revenueSecondaryPerPasture.value === 0) return null
+    return (netProfitSecondaryPerPasture.value / revenueSecondaryPerPasture.value) * 100
+  })
+
   return {
     // Mode
     mode,
@@ -569,7 +604,6 @@ export function usePastureCalculator() {
     specAnimal,
     premium,
     pastures,
-    animalsPerPasture,
 
     // Focus (shared)
     focusEfficiency,
@@ -580,13 +614,11 @@ export function usePastureCalculator() {
     productionAnimal,
     animalsWithFocus,
     animalsUnfocused,
-    useSecondary,
     favFoodActive,
     priceYoung,
     priceAdult,
     priceFood,
     foodPerAnimal,
-    priceSecondary,
 
     // Production computed
     productionData,
@@ -595,8 +627,6 @@ export function usePastureCalculator() {
     animalsUnfocusedPerPasture,
     adultsPerPasture,
     adultsTotal,
-    secondaryPerPasture,
-    secondaryTotal,
     effectiveFoodMultiplier,
     foodCostPerPasture,
     foodCostTotal,
@@ -638,5 +668,27 @@ export function usePastureCalculator() {
     netProfitRidingTotal,
     profitMarginRiding,
     ridingGrowthHours,
+
+    // Secondary state
+    secondaryAnimal,
+    priceSecondaryAdult,
+    priceSecondaryProduct,
+    priceSecondaryFood,
+    favFoodActiveSecondary,
+
+    // Secondary computed
+    secondaryProductionData,
+    secondaryFoodPerAnimal,
+    secondaryItemsPerPasture,
+    secondaryItemsTotal,
+    secondaryFoodCostPerPasture,
+    secondaryFoodCostTotal,
+    revenueSecondaryPerPasture,
+    revenueSecondaryTotal,
+    costSecondaryPerPasture,
+    costSecondaryTotal,
+    netProfitSecondaryPerPasture,
+    netProfitSecondaryTotal,
+    profitMarginSecondary,
   }
 }

@@ -3,6 +3,7 @@ import { watch } from 'vue'
 import {
   usePastureCalculator,
   PRODUCTION_OPTIONS,
+  SECONDARY_OPTIONS,
   RIDING_OPTIONS,
   formatGrowthTime,
 } from '@/composables/usePastureCalculator'
@@ -21,7 +22,6 @@ const {
   specAnimal,
   premium,
   pastures,
-  animalsPerPasture,
   focusEfficiency,
   focusPerAnimal,
   focusReductionPct,
@@ -29,20 +29,16 @@ const {
   productionAnimal,
   animalsWithFocus,
   animalsUnfocused,
-  useSecondary,
   favFoodActive,
   priceYoung,
   priceAdult,
   priceFood,
   foodPerAnimal,
-  priceSecondary,
   // Production computed
   productionData,
   totalAnimals,
   adultsPerPasture,
   adultsTotal,
-  secondaryPerPasture,
-  secondaryTotal,
   foodCostPerPasture,
   foodCostTotal,
   focusProdPerPasture,
@@ -80,6 +76,26 @@ const {
   netProfitRidingTotal,
   profitMarginRiding,
   ridingGrowthHours,
+  // Secondary state
+  secondaryAnimal,
+  priceSecondaryAdult,
+  priceSecondaryProduct,
+  priceSecondaryFood,
+  favFoodActiveSecondary,
+  // Secondary computed
+  secondaryProductionData,
+  secondaryFoodPerAnimal,
+  secondaryItemsPerPasture,
+  secondaryItemsTotal,
+  secondaryFoodCostPerPasture,
+  secondaryFoodCostTotal,
+  revenueSecondaryPerPasture,
+  revenueSecondaryTotal,
+  costSecondaryPerPasture,
+  costSecondaryTotal,
+  netProfitSecondaryPerPasture,
+  netProfitSecondaryTotal,
+  profitMarginSecondary,
 } = usePastureCalculator()
 
 // Keep base food quantity at 18; the effectiveFoodMultiplier (×0.5) handles the fav-food discount
@@ -124,6 +140,17 @@ watch(
       >
         Animais de Montaria
       </button>
+      <button
+        @click="mode = 'secondary'"
+        :class="[
+          'px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer',
+          mode === 'secondary'
+            ? 'bg-yellow-400 text-gray-950'
+            : 'bg-gray-800 text-gray-300 hover:bg-gray-700',
+        ]"
+      >
+        Produções Secundárias
+      </button>
     </div>
 
     <!-- ════════════════════════════════════════════════════════════════ -->
@@ -164,24 +191,19 @@ watch(
               <div>
                 <p class="text-xs text-gray-500 mb-0.5">Sem foco</p>
                 <p class="font-semibold text-gray-300">
-                  {{ (productionData.yieldUnfocused * 100).toFixed(0) }}%
+                  {{ (productionData.yieldUnfocused * 100).toFixed(2) }}%
                 </p>
               </div>
               <div>
                 <p class="text-xs text-gray-500 mb-0.5">Com foco</p>
                 <p class="font-semibold text-green-400">
-                  {{ (productionData.yieldFocused * 100).toFixed(0) }}%
+                  {{ (productionData.yieldFocused * 100).toFixed(2) }}%
                 </p>
               </div>
             </div>
             <div class="mt-2 pt-2 border-t border-gray-700">
               <p class="text-xs text-gray-500 mb-0.5">Comida favorita</p>
               <p class="text-xs font-semibold text-yellow-300">{{ productionData.favFood }}</p>
-              <p v-if="productionData.hasSecondary" class="text-xs text-gray-500 mt-1">
-                Produção secundária:
-                <span class="text-gray-300 font-semibold">{{ productionData.secondaryName }}</span>
-                (~9 por animal)
-              </p>
             </div>
           </div>
         </div>
@@ -201,6 +223,19 @@ watch(
               stroke-linejoin="round"
               stroke-width="2"
               d="M9 5l7 7-7 7"
+            />
+          </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
             />
           </svg>
         </div>
@@ -259,30 +294,22 @@ watch(
             <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Configurações
             </h3>
-            <label
-              class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors mb-2"
-            >
-              <input type="checkbox" v-model="premium" class="accent-yellow-400" />
-              <span class="text-sm">Premium ativo</span>
-              <span class="ml-auto text-xs text-gray-500">Ciclo ×2 mais rápido</span>
-            </label>
-            <label
-              class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors mb-2"
-            >
-              <input type="checkbox" v-model="favFoodActive" class="accent-yellow-400" />
-              <span class="text-sm">Comida favorita ({{ productionData.favFood }})</span>
-              <span class="ml-auto text-xs text-gray-500">Comida ÷2</span>
-            </label>
-            <label
-              v-if="productionData.hasSecondary"
-              class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors"
-            >
-              <input type="checkbox" v-model="useSecondary" class="accent-yellow-400" />
-              <span class="text-sm">Produção secundária</span>
-              <span class="ml-auto text-xs text-gray-500"
-                >Animal → {{ productionData.secondaryName }}</span
+            <div class="space-y-2">
+              <label
+                class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors"
               >
-            </label>
+                <input type="checkbox" v-model="premium" class="accent-yellow-400" />
+                <span class="text-sm">Premium ativo</span>
+                <span class="ml-auto text-xs text-gray-500">Ciclo ×2 mais rápido</span>
+              </label>
+              <label
+                class="flex items-center gap-2 cursor-pointer hover:text-orange-300 transition-colors"
+              >
+                <input type="checkbox" v-model="favFoodActive" class="accent-orange-400" />
+                <span class="text-sm">Comida favorita ({{ productionData.favFood }})</span>
+                <span class="ml-auto text-xs text-gray-500">Comida ÷2</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -303,6 +330,19 @@ watch(
               d="M9 5l7 7-7 7"
             />
           </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
 
         <!-- Pasture & Animals -->
@@ -311,39 +351,25 @@ watch(
             Pasto &amp; Animais
           </h2>
 
-          <div class="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label class="text-xs text-gray-500 mb-2 block">Número de pastos</label>
-              <input
-                type="number"
-                v-model.number="pastures"
-                min="1"
-                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-              />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 mb-2 block"
-                >Animais / pasto (máx. {{ animalsPerPasture * pastures }})</label
-              >
-              <input
-                type="number"
-                v-model.number="animalsPerPasture"
-                min="1"
-                :max="animalsPerPasture * pastures"
-                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-              />
-            </div>
+          <div class="mb-4">
+            <label class="text-xs text-gray-500 mb-2 block">Número de pastos</label>
+            <input
+              type="number"
+              v-model.number="pastures"
+              min="1"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
           </div>
 
           <div class="border-t border-gray-700 pt-4 mb-4">
             <label class="text-xs text-gray-500 mb-2 block">
-              Animais com foco (máx. {{ animalsPerPasture * pastures }})
+              Animais com foco (máx. {{ 9 * pastures }})
             </label>
             <input
               type="number"
               v-model.number="animalsWithFocus"
               min="0"
-              :max="animalsPerPasture * pastures"
+              :max="9 * pastures"
               class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
             />
             <div class="flex items-center justify-between text-xs text-gray-500 mt-1.5">
@@ -359,7 +385,7 @@ watch(
               <div class="flex justify-between">
                 <span class="text-gray-500">Animais colocados</span>
                 <span class="text-gray-300 font-semibold">
-                  {{ animalsPerPasture }} × {{ pastures }} = {{ totalAnimals }}
+                  9 × {{ pastures }} = {{ totalAnimals }}
                 </span>
               </div>
               <div class="flex justify-between">
@@ -379,15 +405,21 @@ watch(
                   ~{{ adultsPerPasture.toFixed(2) }}
                 </span>
               </div>
-              <div v-if="useSecondary && productionData.hasSecondary" class="flex justify-between">
-                <span class="text-gray-500">{{ productionData.secondaryName }} / pasto</span>
-                <span class="text-green-400 font-semibold"
-                  >~{{ secondaryPerPasture.toFixed(1) }}</span
-                >
-              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ── Row 2: mobile arrow ─────────────────────────────────────── -->
+      <div class="flex md:hidden items-center justify-center text-gray-600 mb-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
       </div>
 
       <!-- Row 2: Prices + Summary -->
@@ -412,7 +444,7 @@ watch(
                 class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
               />
             </div>
-            <div v-if="!useSecondary || !productionData.hasSecondary">
+            <div>
               <label class="text-xs text-gray-400 mb-1 block">
                 Preço de
                 <span class="text-yellow-300 font-semibold">{{ productionData.adultName }}</span>
@@ -421,21 +453,6 @@ watch(
               <input
                 type="number"
                 v-model.number="priceAdult"
-                min="0"
-                placeholder="0"
-                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
-              />
-            </div>
-            <div v-if="useSecondary && productionData.hasSecondary">
-              <label class="text-xs text-gray-400 mb-1 block">
-                Preço de
-                <span class="text-yellow-300 font-semibold">{{
-                  productionData.secondaryName
-                }}</span>
-              </label>
-              <input
-                type="number"
-                v-model.number="priceSecondary"
                 min="0"
                 placeholder="0"
                 class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
@@ -487,6 +504,19 @@ watch(
               d="M9 5l7 7-7 7"
             />
           </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
 
         <!-- Summary -->
@@ -508,14 +538,9 @@ watch(
                 >Comida favorita</span
               >
               <span
-                v-if="useSecondary && productionData.hasSecondary"
-                class="bg-purple-400/20 text-purple-300 px-2 py-1 rounded-full border border-purple-400/30"
-                >Produção secundária</span
-              >
-              <span
-                v-if="focusEfficiency > 0"
+                v-if="animalsWithFocus > 0"
                 class="bg-blue-900/40 text-blue-300 px-2 py-1 rounded-full border border-blue-700/40"
-                >Foco −{{ focusReductionPct.toFixed(1) }}%</span
+                >Foco</span
               >
               <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded-full font-semibold"
                 >{{ pastures }} pasto{{ pastures !== 1 ? 's' : '' }}</span
@@ -539,9 +564,9 @@ watch(
                   ~{{ adultsPerPasture.toFixed(2) }}
                 </p>
               </div>
-              <div v-if="useSecondary && productionData.hasSecondary">
-                <p class="text-xs text-gray-500 mb-0.5">{{ productionData.secondaryName }}</p>
-                <p class="font-semibold text-green-400">~{{ secondaryPerPasture.toFixed(1) }}</p>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Animais adultos retornados</p>
+                <p class="font-semibold text-green-300">9 / pasto</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500 mb-0.5">Foco gasto</p>
@@ -640,33 +665,8 @@ watch(
               </tr>
             </thead>
             <tbody>
-              <!-- Secondary mode: secondary products row -->
-              <tr
-                v-if="useSecondary && productionData.hasSecondary"
-                class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
-              >
-                <td class="px-3 py-2 text-yellow-300">
-                  <span
-                    :class="['text-xs font-bold px-1 rounded mr-1', tierBg(productionData.tier)]"
-                    :style="{ color: tierTextColor(productionData.tier) }"
-                    >T{{ productionData.tier }}</span
-                  >
-                  {{ productionData.secondaryName }}
-                </td>
-                <td class="px-3 py-2 text-gray-400">~{{ secondaryPerPasture.toFixed(1) }}</td>
-                <td class="px-3 py-2">{{ fmt(priceSecondary) }}</td>
-                <td class="px-3 py-2 text-green-400 font-semibold">
-                  {{ fmt(revenueProdPerPasture) }}
-                </td>
-                <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
-                  ~{{ secondaryTotal.toFixed(1) }}
-                </td>
-                <td v-if="pastures > 1" class="px-3 py-2 text-green-400 font-semibold">
-                  {{ fmt(revenueProdTotal) }}
-                </td>
-              </tr>
               <!-- Normal mode: adults row -->
-              <tr v-else class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
+              <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
                 <td class="px-3 py-2 text-yellow-300">
                   <span
                     :class="['text-xs font-bold px-1 rounded mr-1', tierBg(productionData.tier)]"
@@ -675,23 +675,20 @@ watch(
                   >
                   {{ productionData.adultName }}
                 </td>
-                <td class="px-3 py-2 text-gray-400">{{ animalsPerPasture }}</td>
+                <td class="px-3 py-2 text-gray-400">9</td>
                 <td class="px-3 py-2">{{ fmt(priceAdult) }}</td>
                 <td class="px-3 py-2 text-green-400 font-semibold">
-                  {{ fmt(animalsPerPasture * priceAdult) }}
+                  {{ fmt(9 * priceAdult) }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
-                  {{ animalsPerPasture * pastures }}
+                  {{ 9 * pastures }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-green-400 font-semibold">
-                  {{ fmt(animalsPerPasture * pastures * priceAdult) }}
+                  {{ fmt(9 * pastures * priceAdult) }}
                 </td>
               </tr>
               <!-- Normal mode: offspring (filhotes) row -->
-              <tr
-                v-if="!(useSecondary && productionData.hasSecondary)"
-                class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
-              >
+              <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
                 <td class="px-3 py-2 text-yellow-300">
                   <span
                     :class="['text-xs font-bold px-1 rounded mr-1', tierBg(productionData.tier)]"
@@ -721,16 +718,14 @@ watch(
                   >
                   {{ productionData.youngName }} (custo)
                 </td>
-                <td class="px-3 py-2 text-gray-400">{{ animalsPerPasture }}</td>
+                <td class="px-3 py-2 text-gray-400">9</td>
                 <td class="px-3 py-2">{{ fmt(priceYoung) }}</td>
-                <td class="px-3 py-2 text-red-400 font-semibold">
-                  −{{ fmt(animalsPerPasture * priceYoung) }}
-                </td>
+                <td class="px-3 py-2 text-red-400 font-semibold">−{{ fmt(9 * priceYoung) }}</td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
-                  {{ animalsPerPasture * pastures }}
+                  {{ 9 * pastures }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-red-400 font-semibold">
-                  −{{ fmt(animalsPerPasture * pastures * priceYoung) }}
+                  −{{ fmt(9 * pastures * priceYoung) }}
                 </td>
               </tr>
               <tr
@@ -802,6 +797,22 @@ watch(
               <p class="text-blue-400 font-bold">{{ fmt(focusProdPerPasture) }}</p>
             </div>
           </div>
+          <div v-if="pastures > 1" class="mt-3 border-t border-blue-700/40 pt-3">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Foco total ({{ pastures }} pastos)</p>
+                <p class="text-blue-400 font-bold">{{ fmt(focusProdTotal) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Animais com foco total</p>
+                <p class="text-gray-300 font-semibold">{{ animalsWithFocus }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Foco base (sem spec.)</p>
+                <p class="text-gray-400 font-semibold">1.000 / animal</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Offspring sustainability banner -->
@@ -824,7 +835,7 @@ watch(
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <p class="text-xs text-gray-500 mb-0.5">Animais colocados / pasto</p>
-              <p class="text-gray-300 font-semibold">{{ animalsPerPasture }}</p>
+              <p class="text-gray-300 font-semibold">9</p>
             </div>
             <div>
               <p class="text-xs text-gray-500 mb-0.5">Filhotes esperados / pasto</p>
@@ -840,13 +851,13 @@ watch(
             <div>
               <p class="text-xs text-gray-500 mb-0.5">% retorno com foco</p>
               <p class="text-gray-300 font-semibold">
-                {{ (productionData.yieldFocused * 100).toFixed(0) }}%
+                {{ (productionData.yieldFocused * 100).toFixed(2) }}%
               </p>
             </div>
             <div>
               <p class="text-xs text-gray-500 mb-0.5">% retorno sem foco</p>
               <p class="text-gray-300 font-semibold">
-                {{ (productionData.yieldUnfocused * 100).toFixed(0) }}%
+                {{ (productionData.yieldUnfocused * 100).toFixed(2) }}%
               </p>
             </div>
           </div>
@@ -995,6 +1006,19 @@ watch(
               d="M9 5l7 7-7 7"
             />
           </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
 
         <!-- Focus & Config -->
@@ -1051,15 +1075,17 @@ watch(
             <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Configurações
             </h3>
-            <label
-              class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors"
-            >
-              <input type="checkbox" v-model="premium" class="accent-yellow-400" />
-              <span class="text-sm">Premium ativo</span>
-              <span class="ml-auto text-xs text-gray-500"
-                >Ciclo: {{ formatGrowthTime(ridingGrowthHours) }}</span
+            <div class="space-y-2">
+              <label
+                class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors"
               >
-            </label>
+                <input type="checkbox" v-model="premium" class="accent-yellow-400" />
+                <span class="text-sm">Premium ativo</span>
+                <span class="ml-auto text-xs text-gray-500"
+                  >Ciclo: {{ formatGrowthTime(ridingGrowthHours) }}</span
+                >
+              </label>
+            </div>
           </div>
 
           <!-- Cycle info -->
@@ -1111,6 +1137,19 @@ watch(
               d="M9 5l7 7-7 7"
             />
           </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
 
         <!-- Pasture & Nutrition -->
@@ -1119,43 +1158,31 @@ watch(
             Pasto &amp; Nutrição
           </h2>
 
-          <div class="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label class="text-xs text-gray-500 mb-2 block">Número de pastos</label>
-              <input
-                type="number"
-                v-model.number="pastures"
-                min="1"
-                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-              />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 mb-2 block">Animais / pasto (máx. 9)</label>
-              <input
-                type="number"
-                v-model.number="animalsPerPasture"
-                min="1"
-                max="9"
-                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
-              />
-            </div>
+          <div class="mb-4">
+            <label class="text-xs text-gray-500 mb-2 block">Número de pastos</label>
+            <input
+              type="number"
+              v-model.number="pastures"
+              min="1"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
           </div>
 
           <div class="border-t border-gray-700 pt-4 mb-4">
             <label class="text-xs text-gray-500 mb-2 block">
-              Com foco (máx. {{ animalsPerPasture * pastures }})
+              Com foco (máx. {{ 9 * pastures }})
             </label>
             <input
               type="number"
               v-model.number="ridingAnimalsWithFocus"
               min="0"
-              :max="animalsPerPasture * pastures"
+              :max="9 * pastures"
               class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
             />
             <div class="flex items-center justify-between text-xs text-gray-500 mt-1.5">
               <span
                 >{{ ridingAnimalsWithFocus }} com foco ·
-                {{ animalsPerPasture * pastures - ridingAnimalsWithFocus }} sem foco</span
+                {{ 9 * pastures - ridingAnimalsWithFocus }} sem foco</span
               >
               <span class="text-blue-400 font-semibold">{{ fmt(focusRidingTotal) }} foco</span>
             </div>
@@ -1168,8 +1195,7 @@ watch(
               <div class="flex justify-between">
                 <span class="text-gray-500">Animais totais</span>
                 <span class="text-gray-300 font-semibold"
-                  >{{ animalsPerPasture }} × {{ pastures }} =
-                  {{ animalsPerPasture * pastures }}</span
+                  >9 × {{ pastures }} = {{ 9 * pastures }}</span
                 >
               </div>
               <div class="flex justify-between">
@@ -1185,6 +1211,18 @@ watch(
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ── Row 2: mobile arrow ─────────────────────────────────────── -->
+      <div class="flex md:hidden items-center justify-center text-gray-600 mb-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
       </div>
 
       <!-- Row 2: Prices + Summary -->
@@ -1257,6 +1295,19 @@ watch(
               d="M9 5l7 7-7 7"
             />
           </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
 
         <!-- Summary -->
@@ -1273,9 +1324,9 @@ watch(
                 >Premium</span
               >
               <span
-                v-if="focusEfficiency > 0"
+                v-if="ridingAnimalsWithFocus > 0"
                 class="bg-blue-900/40 text-blue-300 px-2 py-1 rounded-full border border-blue-700/40"
-                >Foco −{{ focusReductionPct.toFixed(1) }}%</span
+                >Foco</span
               >
               <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded-full font-semibold"
                 >{{ pastures }} pasto{{ pastures !== 1 ? 's' : '' }}</span
@@ -1297,6 +1348,10 @@ watch(
                 <p class="font-semibold text-green-400">
                   ~{{ expectedFoalsPerPasture.toFixed(2) }}
                 </p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Animais adultos retornados</p>
+                <p class="font-semibold text-green-300">9 / pasto</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500 mb-0.5">Com foco / pasto</p>
@@ -1420,16 +1475,16 @@ watch(
               </tr>
               <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
                 <td class="px-3 py-2 text-red-400">{{ ridingData.youngName }} (custo)</td>
-                <td class="px-3 py-2 text-gray-400">{{ animalsPerPasture }}</td>
+                <td class="px-3 py-2 text-gray-400">9</td>
                 <td class="px-3 py-2">{{ fmt(priceRidingYoung) }}</td>
                 <td class="px-3 py-2 text-red-400 font-semibold">
-                  −{{ fmt(animalsPerPasture * priceRidingYoung) }}
+                  −{{ fmt(9 * priceRidingYoung) }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
-                  {{ animalsPerPasture * pastures }}
+                  {{ 9 * pastures }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-red-400 font-semibold">
-                  −{{ fmt(animalsPerPasture * pastures * priceRidingYoung) }}
+                  −{{ fmt(9 * pastures * priceRidingYoung) }}
                 </td>
               </tr>
               <tr
@@ -1437,17 +1492,17 @@ watch(
                 class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
               >
                 <td class="px-3 py-2 text-red-400">
-                  Comida ({{ foodPerAnimalRiding }} × {{ animalsPerPasture }} animais)
+                  Comida ({{ foodPerAnimalRiding }} × 9 animais)
                 </td>
                 <td class="px-3 py-2 text-gray-400">
-                  {{ foodPerAnimalRiding * animalsPerPasture }}
+                  {{ foodPerAnimalRiding * 9 }}
                 </td>
                 <td class="px-3 py-2">{{ fmt(priceRidingFood) }}</td>
                 <td class="px-3 py-2 text-red-400 font-semibold">
                   −{{ fmt(foodCostRidingPerPasture) }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
-                  {{ foodPerAnimalRiding * animalsPerPasture * pastures }}
+                  {{ foodPerAnimalRiding * 9 * pastures }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-red-400 font-semibold">
                   −{{ fmt(foodCostRidingTotal) }}
@@ -1505,6 +1560,22 @@ watch(
               <p class="text-blue-400 font-bold">{{ fmt(focusRidingPerPasture) }}</p>
             </div>
           </div>
+          <div v-if="pastures > 1" class="mt-3 border-t border-blue-700/40 pt-3">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Foco total ({{ pastures }} pastos)</p>
+                <p class="text-blue-400 font-bold">{{ fmt(focusRidingTotal) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Animais com foco total</p>
+                <p class="text-gray-300 font-semibold">{{ ridingAnimalsWithFocus }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Foco base (sem spec.)</p>
+                <p class="text-gray-400 font-semibold">1.000 / nutrição</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Profitability -->
@@ -1543,6 +1614,547 @@ watch(
                   >Margem boa</template
                 >
                 <template v-else-if="profitMarginRiding !== null">Margem ótima</template>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <!-- SECONDARY MODE                                                    -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <template v-if="mode === 'secondary'">
+      <!-- Row 1 -->
+      <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
+        <!-- Animal selector -->
+        <div class="bg-gray-900 rounded-xl p-4 flex-1">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Animal (adulto)
+          </h2>
+          <div class="flex flex-col gap-1.5">
+            <button
+              v-for="opt in SECONDARY_OPTIONS"
+              :key="opt.value"
+              @click="secondaryAnimal = opt.value"
+              :class="[
+                'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer text-left',
+                secondaryAnimal === opt.value
+                  ? 'bg-yellow-400 text-gray-950'
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700',
+              ]"
+            >
+              <span
+                :class="['text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0', tierBg(opt.tier)]"
+                :style="{ color: tierTextColor(opt.tier) }"
+              >
+                T{{ opt.tier }}
+              </span>
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <!-- Production info card -->
+          <div class="mt-4 bg-gray-800 rounded-lg p-3">
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">Produção por ciclo</p>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Itens / animal (sem premium)</p>
+                <p class="font-semibold text-gray-300">7 – 11 (~9)</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Itens / animal (com premium)</p>
+                <p class="font-semibold text-yellow-300">14 – 22 (~18)</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Produto</p>
+                <p class="text-xs font-semibold text-yellow-300">
+                  {{ secondaryProductionData.secondaryName }}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Comida favorita</p>
+                <p class="text-xs font-semibold text-orange-300">
+                  {{ secondaryProductionData.favFood }}
+                </p>
+              </div>
+            </div>
+            <p class="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-700">
+              O animal adulto é consumido a cada ciclo para gerar o produto secundário.
+            </p>
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div
+          class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+        >
+          <svg
+            class="hidden md:block w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+
+        <!-- Pasto & Produção -->
+        <div class="bg-gray-900 rounded-xl p-4 flex-1">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Pasto &amp; Produção
+          </h2>
+
+          <div class="mb-4">
+            <label class="text-xs text-gray-500 mb-2 block">Número de pastos</label>
+            <input
+              type="number"
+              v-model.number="pastures"
+              min="1"
+              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400"
+            />
+          </div>
+
+          <div class="border-t border-gray-700 pt-4 mb-4">
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              Configurações
+            </h3>
+            <div class="space-y-2">
+              <label
+                class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors"
+              >
+                <input type="checkbox" v-model="premium" class="accent-yellow-400" />
+                <span class="text-sm">Premium ativo</span>
+                <span class="ml-auto text-xs text-gray-500">Produção ×2</span>
+              </label>
+              <label
+                class="flex items-center gap-2 cursor-pointer hover:text-orange-300 transition-colors"
+              >
+                <input type="checkbox" v-model="favFoodActiveSecondary" class="accent-orange-400" />
+                <span class="text-sm">Comida favorita</span>
+                <span class="ml-auto text-xs text-gray-500">Comida ÷2</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Cycle summary -->
+          <div class="bg-gray-800 rounded-lg p-3 text-sm">
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">Resumo do ciclo</p>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between">
+                <span class="text-gray-500">Animais adultos / pasto</span>
+                <span class="text-gray-300 font-semibold">9</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500">Itens / animal / ciclo</span>
+                <span class="font-semibold" :class="premium ? 'text-yellow-300' : 'text-gray-300'">
+                  {{ premium ? '14–22 (~18)' : '7–11 (~9)' }}
+                  <span v-if="premium" class="text-xs text-yellow-400 ml-1">(premium)</span>
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500"
+                  >{{ secondaryProductionData.secondaryName }} / pasto</span
+                >
+                <span class="text-green-400 font-semibold">~{{ secondaryItemsPerPasture }}</span>
+              </div>
+              <div v-if="pastures > 1" class="flex justify-between">
+                <span class="text-gray-500">{{ secondaryProductionData.secondaryName }} total</span>
+                <span class="text-green-400 font-semibold">~{{ secondaryItemsTotal }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500">Comida / animal / ciclo</span>
+                <span class="text-orange-300 font-semibold">{{ secondaryFoodPerAnimal }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Row 2: mobile arrow ─────────────────────────────────────── -->
+      <div class="flex md:hidden items-center justify-center text-gray-600 mb-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </div>
+
+      <!-- Row 2: Prices + Summary -->
+      <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
+        <!-- Prices -->
+        <div class="bg-gray-900 rounded-xl p-4 flex-1">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Preços (prata)
+          </h2>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-gray-400 mb-1 block">
+                Preço de
+                <span class="text-yellow-300 font-semibold">{{
+                  secondaryProductionData.adultName
+                }}</span>
+                (adulto — custo por ciclo)
+              </label>
+              <input
+                type="number"
+                v-model.number="priceSecondaryAdult"
+                min="0"
+                placeholder="0"
+                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 mb-1 block">
+                Preço de
+                <span class="text-yellow-300 font-semibold">{{
+                  secondaryProductionData.secondaryName
+                }}</span>
+                (produto)
+              </label>
+              <input
+                type="number"
+                v-model.number="priceSecondaryProduct"
+                min="0"
+                placeholder="0"
+                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 mb-1 block">
+                Preço da comida / por item <span class="text-gray-600 text-xs">(opcional)</span>
+              </label>
+              <input
+                type="number"
+                v-model.number="priceSecondaryFood"
+                min="0"
+                placeholder="0"
+                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div
+          class="flex items-center justify-center flex-shrink-0 text-gray-600 py-1 md:py-0 md:px-1"
+        >
+          <svg
+            class="hidden md:block w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+          <svg
+            class="block md:hidden w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+
+        <!-- Summary -->
+        <div class="bg-gray-900 rounded-xl p-4 flex-1 flex flex-col gap-4">
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Configuração ativa</p>
+            <div class="flex flex-wrap gap-1.5 text-xs">
+              <span class="bg-gray-800 px-2 py-1 rounded-full text-gray-300">
+                {{ secondaryProductionData.adultName }}
+              </span>
+              <span
+                v-if="premium"
+                class="bg-yellow-400/20 text-yellow-300 px-2 py-1 rounded-full border border-yellow-400/30"
+                >Premium</span
+              >
+              <span
+                v-if="favFoodActiveSecondary"
+                class="bg-orange-400/20 text-orange-300 px-2 py-1 rounded-full border border-orange-400/30"
+                >Comida favorita</span
+              >
+              <span
+                class="bg-purple-400/20 text-purple-300 px-2 py-1 rounded-full border border-purple-400/30"
+              >
+                Produção secundária
+              </span>
+              <span class="bg-gray-700 text-yellow-300 px-2 py-1 rounded-full font-semibold">
+                {{ pastures }} pasto{{ pastures !== 1 ? 's' : '' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="bg-gray-800 rounded-lg p-3">
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">
+              Produção por pasto (1 ciclo)
+            </p>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">
+                  {{ secondaryProductionData.secondaryName }}
+                </p>
+                <p class="font-semibold text-green-400">~{{ secondaryItemsPerPasture }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Custo animais / pasto</p>
+                <p class="text-red-400 font-semibold">{{ fmt(9 * priceSecondaryAdult) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Receita / pasto</p>
+                <p class="font-semibold text-yellow-300">{{ fmt(revenueSecondaryPerPasture) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Custo comida / pasto</p>
+                <p class="text-red-400 font-semibold">{{ fmt(secondaryFoodCostPerPasture) }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="bg-gray-900 rounded-xl p-6">
+        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados — Produção Secundária</h2>
+
+        <!-- KPI per pasture -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-gray-800 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Receita / pasto</p>
+            <p class="text-2xl font-bold text-yellow-300">{{ fmt(revenueSecondaryPerPasture) }}</p>
+            <p class="text-xs text-gray-600 mt-1">prata</p>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Custo / pasto</p>
+            <p class="text-2xl font-bold text-red-400">{{ fmt(costSecondaryPerPasture) }}</p>
+            <p class="text-xs text-gray-600 mt-1">animais + comida</p>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4 text-center col-span-2 md:col-span-1">
+            <p class="text-xs text-gray-400 mb-1">Lucro líquido / pasto</p>
+            <p class="text-2xl font-bold" :class="profitColorClass(netProfitSecondaryPerPasture)">
+              {{ fmt(netProfitSecondaryPerPasture) }}
+            </p>
+            <p class="text-xs text-gray-600 mt-1">prata</p>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Itens / pasto</p>
+            <p class="text-2xl font-bold text-green-400">~{{ secondaryItemsPerPasture }}</p>
+            <p class="text-xs text-gray-600 mt-1">{{ secondaryProductionData.secondaryName }}</p>
+          </div>
+        </div>
+
+        <!-- Multi-pasture totals -->
+        <div v-if="pastures > 1" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-blue-900/20 border border-blue-700/40 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Receita total / {{ pastures }} pastos</p>
+            <p class="text-xl font-bold text-yellow-300">{{ fmt(revenueSecondaryTotal) }}</p>
+          </div>
+          <div class="bg-red-900/20 border border-red-700/40 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Custo total / {{ pastures }} pastos</p>
+            <p class="text-xl font-bold text-red-400">{{ fmt(costSecondaryTotal) }}</p>
+          </div>
+          <div
+            :class="[
+              'rounded-xl p-4 text-center col-span-2 md:col-span-1 border',
+              netProfitSecondaryTotal >= 0
+                ? 'bg-green-900/20 border-green-700/40'
+                : 'bg-red-900/20 border-red-700/40',
+            ]"
+          >
+            <p class="text-xs text-gray-400 mb-1">Lucro total / {{ pastures }} pastos</p>
+            <p class="text-xl font-bold" :class="profitColorClass(netProfitSecondaryTotal)">
+              {{ fmt(netProfitSecondaryTotal) }}
+            </p>
+          </div>
+          <div class="bg-green-900/20 border border-green-700/40 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Itens totais / {{ pastures }} pastos</p>
+            <p class="text-xl font-bold text-green-400">~{{ secondaryItemsTotal }}</p>
+          </div>
+        </div>
+
+        <!-- Breakdown table -->
+        <div class="overflow-x-auto mb-6">
+          <table class="w-full text-sm border-collapse">
+            <thead>
+              <tr class="bg-gray-800 text-gray-400 text-left text-xs">
+                <th class="px-3 py-2 rounded-tl-lg">Item</th>
+                <th class="px-3 py-2">Qtd. (1 pasto)</th>
+                <th class="px-3 py-2">Preço unit.</th>
+                <th class="px-3 py-2 text-yellow-400">Valor (1 pasto)</th>
+                <th v-if="pastures > 1" class="px-3 py-2 border-l border-gray-700">
+                  Qtd. ({{ pastures }} pastos)
+                </th>
+                <th v-if="pastures > 1" class="px-3 py-2 text-yellow-400 rounded-tr-lg">
+                  Valor ({{ pastures }} pastos)
+                </th>
+                <th v-else class="px-3 py-2 rounded-tr-lg"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Secondary product revenue -->
+              <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
+                <td class="px-3 py-2 text-yellow-300">
+                  <span
+                    :class="[
+                      'text-xs font-bold px-1 rounded mr-1',
+                      tierBg(secondaryProductionData.tier),
+                    ]"
+                    :style="{ color: tierTextColor(secondaryProductionData.tier) }"
+                    >T{{ secondaryProductionData.tier }}</span
+                  >
+                  {{ secondaryProductionData.secondaryName }}
+                </td>
+                <td class="px-3 py-2 text-gray-400">~{{ secondaryItemsPerPasture }}</td>
+                <td class="px-3 py-2">{{ fmt(priceSecondaryProduct) }}</td>
+                <td class="px-3 py-2 text-green-400 font-semibold">
+                  {{ fmt(revenueSecondaryPerPasture) }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
+                  ~{{ secondaryItemsTotal }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-green-400 font-semibold">
+                  {{ fmt(revenueSecondaryTotal) }}
+                </td>
+              </tr>
+              <!-- Adult animal cost -->
+              <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
+                <td class="px-3 py-2 text-red-400">
+                  <span
+                    :class="[
+                      'text-xs font-bold px-1 rounded mr-1',
+                      tierBg(secondaryProductionData.tier),
+                    ]"
+                    :style="{ color: tierTextColor(secondaryProductionData.tier) }"
+                    >T{{ secondaryProductionData.tier }}</span
+                  >
+                  {{ secondaryProductionData.adultName }} (custo)
+                </td>
+                <td class="px-3 py-2 text-gray-400">9</td>
+                <td class="px-3 py-2">{{ fmt(priceSecondaryAdult) }}</td>
+                <td class="px-3 py-2 text-red-400 font-semibold">
+                  −{{ fmt(9 * priceSecondaryAdult) }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
+                  {{ 9 * pastures }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-red-400 font-semibold">
+                  −{{ fmt(9 * pastures * priceSecondaryAdult) }}
+                </td>
+              </tr>
+              <!-- Food cost -->
+              <tr
+                v-if="priceSecondaryFood > 0"
+                class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
+              >
+                <td class="px-3 py-2 text-red-400">
+                  Comida ({{ secondaryFoodPerAnimal }} × 9 animais)
+                </td>
+                <td class="px-3 py-2 text-gray-400">{{ secondaryFoodPerAnimal * 9 }}</td>
+                <td class="px-3 py-2">{{ fmt(priceSecondaryFood) }}</td>
+                <td class="px-3 py-2 text-red-400 font-semibold">
+                  −{{ fmt(secondaryFoodCostPerPasture) }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
+                  {{ secondaryFoodPerAnimal * 9 * pastures }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-red-400 font-semibold">
+                  −{{ fmt(secondaryFoodCostTotal) }}
+                </td>
+              </tr>
+              <tr class="border-t-2 border-gray-700 bg-gray-800/60 font-semibold">
+                <td class="px-3 py-2 text-yellow-400 rounded-bl-lg">LUCRO LÍQUIDO</td>
+                <td class="px-3 py-2 text-gray-500">—</td>
+                <td class="px-3 py-2 text-gray-500">—</td>
+                <td
+                  class="px-3 py-2 text-base"
+                  :class="profitColorClass(netProfitSecondaryPerPasture)"
+                >
+                  {{ fmt(netProfitSecondaryPerPasture) }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-gray-500 border-l border-gray-700">
+                  —
+                </td>
+                <td
+                  v-if="pastures > 1"
+                  class="px-3 py-2 text-base rounded-br-lg"
+                  :class="profitColorClass(netProfitSecondaryTotal)"
+                >
+                  {{ fmt(netProfitSecondaryTotal) }}
+                </td>
+                <td v-else class="px-3 py-2 rounded-br-lg"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Profitability -->
+        <div class="border-t border-gray-700 pt-5">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            Lucratividade ({{ pastures > 1 ? pastures + ' pastos' : '1 pasto' }})
+          </h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <p class="text-xs text-gray-400 mb-1">Receita total</p>
+              <p class="text-xl font-bold text-gray-200">{{ fmt(revenueSecondaryTotal) }}</p>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <p class="text-xs text-gray-400 mb-1">Custo total</p>
+              <p class="text-xl font-bold text-red-400">{{ fmt(costSecondaryTotal) }}</p>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <p class="text-xs text-gray-400 mb-1">Lucro líquido total</p>
+              <p class="text-xl font-bold" :class="profitColorClass(netProfitSecondaryTotal)">
+                {{ fmt(netProfitSecondaryTotal) }}
+              </p>
+            </div>
+            <div class="rounded-xl p-3 text-center" :class="marginBgClass(profitMarginSecondary)">
+              <p class="text-xs text-gray-400 mb-1">Margem de lucro</p>
+              <p class="text-2xl font-bold" :class="marginColorClass(profitMarginSecondary)">
+                {{ profitMarginSecondary !== null ? profitMarginSecondary.toFixed(1) + '%' : '—' }}
+              </p>
+              <p class="text-xs mt-1" :class="marginColorClass(profitMarginSecondary)">
+                <template v-if="profitMarginSecondary !== null && profitMarginSecondary < 0"
+                  >Prejuízo</template
+                >
+                <template v-else-if="profitMarginSecondary !== null && profitMarginSecondary < 10"
+                  >Margem baixa</template
+                >
+                <template v-else-if="profitMarginSecondary !== null && profitMarginSecondary < 20"
+                  >Margem boa</template
+                >
+                <template v-else-if="profitMarginSecondary !== null">Margem ótima</template>
               </p>
             </div>
           </div>

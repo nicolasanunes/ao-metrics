@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Quality, type Item, Location } from '@/types/items'
 import { fetchPrices, type PriceData } from '@/services/marketService'
@@ -70,6 +70,7 @@ function addItem(id: string) {
 
 function removeItem(id: string) {
   selectedItems.value = selectedItems.value.filter((i) => i !== id)
+  search()
 }
 
 const allLocations = Object.values(Location)
@@ -98,6 +99,10 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 let currentAbortController: AbortController | null = null
+
+onUnmounted(() => {
+  currentAbortController?.abort()
+})
 
 watch(isValid, (valid) => {
   if (!valid) {
@@ -205,21 +210,111 @@ const sortedResults = computed(() => {
   })
 })
 
+// ── Resource quick-select ────────────────────────────────────────────────────
+
+const resourceCardOpen = ref(false)
+
+const rawResourceTypes = [
+  { key: 'ORE', label: 'Minério' },
+  { key: 'WOOD', label: 'Madeira' },
+  { key: 'FIBER', label: 'Fibra' },
+  { key: 'HIDE', label: 'Pelego' },
+  { key: 'ROCK', label: 'Pedra' },
+]
+
+const refinedResourceTypes = [
+  { key: 'METALBAR', label: 'Barra de Metal' },
+  { key: 'PLANKS', label: 'Tábuas' },
+  { key: 'CLOTH', label: 'Tecido' },
+  { key: 'LEATHER', label: 'Couro' },
+  { key: 'STONEBLOCK', label: 'Bloco de Pedra' },
+]
+
+const selectedRawTypes = ref<string[]>([])
+const selectedRefinedTypes = ref<string[]>([])
+const selectedResourceTiers = ref<number[]>([4, 5, 6, 7, 8])
+const selectedResourceEnchants = ref<number[]>([0])
+
+const allRawSelected = computed(() => selectedRawTypes.value.length === rawResourceTypes.length)
+const allRefinedSelected = computed(
+  () => selectedRefinedTypes.value.length === refinedResourceTypes.length,
+)
+
+function toggleAllRaw() {
+  selectedRawTypes.value = allRawSelected.value ? [] : rawResourceTypes.map((r) => r.key)
+}
+function toggleAllRefined() {
+  selectedRefinedTypes.value = allRefinedSelected.value
+    ? []
+    : refinedResourceTypes.map((r) => r.key)
+}
+
+const refinedTypes = new Set(['METALBAR', 'PLANKS', 'CLOTH', 'LEATHER', 'STONEBLOCK'])
+
+const generatedResourceIds = computed(() => {
+  const ids: string[] = []
+  for (const type of [...selectedRawTypes.value, ...selectedRefinedTypes.value]) {
+    for (const tier of selectedResourceTiers.value) {
+      // Refined resources don't exist at T1
+      if (tier === 1 && refinedTypes.has(type)) continue
+      // T1/T2/T3 and STONEBLOCK have no enchantments; ROCK T4+ only up to .3
+      const enchants =
+        type === 'STONEBLOCK' || tier <= 3
+          ? [0]
+          : type === 'ROCK'
+            ? selectedResourceEnchants.value.filter((e) => e <= 3)
+            : selectedResourceEnchants.value
+      for (const enchant of enchants) {
+        ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}@${enchant}`)
+      }
+    }
+  }
+  return ids
+})
+
+const canSearchResources = computed(
+  () =>
+    generatedResourceIds.value.length > 0 &&
+    selectedLocations.value.length > 0 &&
+    selectedQualities.value.length > 0,
+)
+
+function applyResourceSearch() {
+  if (!generatedResourceIds.value.length) return
+  selectedItems.value = [...generatedResourceIds.value]
+  search()
+}
+
+// ── End resource quick-select ─────────────────────────────────────────────────
+
 const SENTINEL_DATE = '0001-01-01'
 
-function formatDate(dateStr: string) {
-  if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return '-'
+function parseDateStr(dateStr: string): Date | null {
+  if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return null
   const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
   const date = new Date(normalized)
-  if (isNaN(date.getTime())) return '-'
-  return date.toLocaleString('pt-BR', { timeZone: 'UTC' })
+  return isNaN(date.getTime()) ? null : date
+}
+
+function formatDate(dateStr: string) {
+  const date = parseDateStr(dateStr)
+  if (!date) return '-'
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 0) return 'Agora'
+  const totalMin = Math.floor(diffMs / 60000)
+  if (totalMin < 1) return 'Agora'
+  const days = Math.floor(totalMin / 1440)
+  const hours = Math.floor((totalMin % 1440) / 60)
+  const mins = totalMin % 60
+  if (days > 0) return `Há ${days}d ${hours > 0 ? `${hours}h` : ''}`.trimEnd()
+  if (hours > 0 && mins > 0) return `Há ${hours}h ${mins}min`
+  if (hours > 0) return `Há ${hours}h`
+  return `Há ${mins}min`
 }
 
 function dateBgClass(dateStr: string): string {
-  if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return ''
-  const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
-  const date = new Date(normalized)
-  if (isNaN(date.getTime())) return ''
+  const date = parseDateStr(dateStr)
+  if (!date) return ''
   const hoursAgo = (Date.now() - date.getTime()) / 1000 / 3600
   if (hoursAgo < 0.5) return 'bg-blue-900/60 text-blue-300'
   if (hoursAgo < 6) return 'bg-green-900/60 text-green-300'
@@ -239,7 +334,16 @@ function dateBgClass(dateStr: string): string {
     <div class="flex flex-col md:flex-row items-stretch gap-2 mb-6">
       <!-- Items -->
       <div class="bg-gray-900 rounded-xl p-4 flex-1 flex flex-col relative">
-        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Itens</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Itens</h2>
+          <button
+            v-if="selectedItems.length"
+            @click="selectedItems = []"
+            class="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+          >
+            Desmarcar todos
+          </button>
+        </div>
 
         <div class="text-xs text-gray-500 mb-2" v-if="itemsStore.loading">Carregando items...</div>
         <div class="text-xs text-red-400 mb-2" v-else-if="itemsStore.error">
@@ -412,6 +516,192 @@ function dateBgClass(dateStr: string): string {
       <code class="text-xs text-green-400 break-all">{{ previewUrl }}</code>
     </div> -->
 
+    <!-- Resources Quick-Select Card -->
+    <div class="bg-gray-900 rounded-xl mb-6 overflow-hidden">
+      <!-- Header (always visible) -->
+      <button
+        @click="resourceCardOpen = !resourceCardOpen"
+        class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800/60 transition-colors cursor-pointer"
+      >
+        <span class="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+          Busca Rápida de Recursos
+        </span>
+        <svg
+          class="w-4 h-4 text-gray-400 transition-transform duration-200"
+          :class="resourceCardOpen ? 'rotate-180' : ''"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      <!-- Collapsible body -->
+      <div v-if="resourceCardOpen" class="px-4 p-4">
+        <!-- Resource types -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <!-- Raw Resources -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-yellow-400 uppercase tracking-wider"
+                >Recursos Brutos</span
+              >
+              <button
+                @click="toggleAllRaw"
+                class="text-xs text-gray-400 hover:text-yellow-300 transition-colors cursor-pointer"
+              >
+                {{ allRawSelected ? 'Desmarcar todos' : 'Marcar todos' }}
+              </button>
+            </div>
+            <label
+              v-for="rt in rawResourceTypes"
+              :key="rt.key"
+              class="flex items-center gap-2 py-1 cursor-pointer hover:text-yellow-300 transition-colors text-sm text-gray-300"
+            >
+              <input
+                type="checkbox"
+                :value="rt.key"
+                v-model="selectedRawTypes"
+                class="accent-yellow-400"
+              />
+              {{ rt.label }}
+            </label>
+          </div>
+
+          <!-- Refined Resources -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-blue-400 uppercase tracking-wider"
+                >Recursos Refinados</span
+              >
+              <button
+                @click="toggleAllRefined"
+                class="text-xs text-gray-400 hover:text-blue-300 transition-colors cursor-pointer"
+              >
+                {{ allRefinedSelected ? 'Desmarcar todos' : 'Marcar todos' }}
+              </button>
+            </div>
+            <label
+              v-for="rt in refinedResourceTypes"
+              :key="rt.key"
+              class="flex items-center gap-2 py-1 cursor-pointer hover:text-blue-300 transition-colors text-sm text-gray-300"
+            >
+              <input
+                type="checkbox"
+                :value="rt.key"
+                v-model="selectedRefinedTypes"
+                class="accent-blue-400"
+              />
+              {{ rt.label }}
+            </label>
+          </div>
+        </div>
+
+        <!-- Tiers -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tiers</span>
+            <button
+              @click="
+                selectedResourceTiers =
+                  selectedResourceTiers.length === 8 ? [] : [1, 2, 3, 4, 5, 6, 7, 8]
+              "
+              class="text-xs text-gray-400 hover:text-yellow-300 transition-colors cursor-pointer"
+            >
+              {{ selectedResourceTiers.length === 8 ? 'Desmarcar todos' : 'Marcar todos' }}
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <label
+              v-for="tier in [1, 2, 3, 4, 5, 6, 7, 8]"
+              :key="tier"
+              class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
+            >
+              <input
+                type="checkbox"
+                :value="tier"
+                v-model="selectedResourceTiers"
+                class="accent-yellow-400"
+              />
+              <span
+                class="text-xs font-bold px-1.5 py-0.5 rounded"
+                :class="tierBadge(`T${tier}_ORE`).bg"
+                :style="{ color: tierBadge(`T${tier}_ORE`).tierColor }"
+                >T{{ tier }}</span
+              >
+            </label>
+          </div>
+        </div>
+
+        <!-- Enchantments -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
+              >Encantamentos</span
+            >
+            <button
+              @click="
+                selectedResourceEnchants =
+                  selectedResourceEnchants.length === 5 ? [] : [0, 1, 2, 3, 4]
+              "
+              class="text-xs text-gray-400 hover:text-yellow-300 transition-colors cursor-pointer"
+            >
+              {{ selectedResourceEnchants.length === 5 ? 'Desmarcar todos' : 'Marcar todos' }}
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1">
+            <label
+              class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
+            >
+              <input
+                type="checkbox"
+                :value="0"
+                v-model="selectedResourceEnchants"
+                class="accent-yellow-400"
+              />
+              Base
+            </label>
+            <label
+              v-for="e in [1, 2, 3, 4]"
+              :key="e"
+              class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
+            >
+              <input
+                type="checkbox"
+                :value="e"
+                v-model="selectedResourceEnchants"
+                class="accent-yellow-400"
+              />
+              .{{ e }}
+            </label>
+          </div>
+        </div>
+
+        <!-- Footer: count + button -->
+        <div class="flex items-center justify-between pt-3 border-t border-gray-800">
+          <span class="text-xs text-gray-500">
+            <template v-if="generatedResourceIds.length">
+              {{ generatedResourceIds.length }} item(s) para buscar
+            </template>
+            <template v-else> Selecione ao menos um tipo, tier e encantamento </template>
+          </span>
+          <button
+            @click="applyResourceSearch"
+            :disabled="!canSearchResources"
+            class="py-1.5 px-4 rounded-lg text-sm font-semibold transition-colors cursor-pointer bg-yellow-400 text-gray-900 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Buscar recursos
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Error -->
     <div v-if="error" class="mt-4 bg-red-900/50 border border-red-700 rounded-xl p-4 text-red-300">
       {{ error }}
@@ -456,7 +746,7 @@ function dateBgClass(dateStr: string): string {
                 class="px-3 py-2 text-gray-500 text-xs font-normal cursor-pointer select-none hover:text-yellow-300 transition-colors"
                 @click="toggleSort('sell_price_min_date')"
               >
-                Atualizado em (UTC)
+                Atualizado
                 <span class="ml-1">{{ sortIndicator('sell_price_min_date') }}</span>
               </th>
               <th
@@ -470,7 +760,7 @@ function dateBgClass(dateStr: string): string {
                 class="px-3 py-2 text-gray-500 text-xs font-normal cursor-pointer select-none hover:text-yellow-300 transition-colors"
                 @click="toggleSort('sell_price_max_date')"
               >
-                Atualizado em (UTC)
+                Atualizado
                 <span class="ml-1">{{ sortIndicator('sell_price_max_date') }}</span>
               </th>
               <th
@@ -484,7 +774,7 @@ function dateBgClass(dateStr: string): string {
                 class="px-3 py-2 rounded-tr-lg text-gray-500 text-xs font-normal cursor-pointer select-none hover:text-yellow-300 transition-colors"
                 @click="toggleSort('buy_price_max_date')"
               >
-                Atualizado em (UTC)
+                Atualizado
                 <span class="ml-1">{{ sortIndicator('buy_price_max_date') }}</span>
               </th>
             </tr>

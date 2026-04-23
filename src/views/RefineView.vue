@@ -5,7 +5,9 @@ import {
   TIER_OPTIONS,
   ALL_CITIES,
   SUBTIER_COLORS,
+  TIER_WEIGHT,
   fmt,
+  fmtWeight,
   profitColorClass,
   marginColorClass,
   marginBgClass,
@@ -660,9 +662,10 @@ const {
               <th class="px-3 py-2 text-green-400">Retorno (1×)</th>
               <th class="px-3 py-2 text-yellow-400">Líquido (1×)</th>
               <th class="px-3 py-2 border-l border-gray-700">Qtd. ({{ quantity }}×)</th>
+              <th class="px-3 py-2 border-l border-gray-700 text-sky-400 rounded-tr-lg">Peso</th>
               <th class="px-3 py-2 text-red-400">Custo bruto ({{ quantity }}×)</th>
               <th class="px-3 py-2 text-green-400">Retorno ({{ quantity }}×)</th>
-              <th class="px-3 py-2 rounded-tr-lg text-yellow-400">Líquido ({{ quantity }}×)</th>
+              <th class="px-3 py-2 text-yellow-400">Líquido ({{ quantity }}×)</th>
             </tr>
           </thead>
           <tbody>
@@ -682,6 +685,9 @@ const {
               <td class="px-3 py-2 text-green-400">{{ fmt(rawReturn) }}</td>
               <td class="px-3 py-2 font-semibold">{{ fmt(rawGross - rawReturn) }}</td>
               <td class="px-3 py-2 text-gray-400 border-l border-gray-700">{{ rawQtyTotal }}×</td>
+              <td class="px-3 py-2 text-sky-300 border-l border-gray-700 whitespace-nowrap">
+                {{ fmtWeight(rawQtyTotal * (TIER_WEIGHT[rawBadge.tier] ?? 0)) }}
+              </td>
               <td class="px-3 py-2 text-red-400">{{ fmt(rawGrossTotal) }}</td>
               <td class="px-3 py-2 text-green-400">{{ fmt(rawReturnTotal) }}</td>
               <td class="px-3 py-2 font-semibold">{{ fmt(rawGrossTotal - rawReturnTotal) }}</td>
@@ -706,6 +712,9 @@ const {
               <td class="px-3 py-2 text-green-400">{{ fmt(subReturn) }}</td>
               <td class="px-3 py-2 font-semibold">{{ fmt(subGross - subReturn) }}</td>
               <td class="px-3 py-2 text-gray-400 border-l border-gray-700">{{ subQtyTotal }}×</td>
+              <td class="px-3 py-2 text-sky-300 border-l border-gray-700 whitespace-nowrap">
+                {{ fmtWeight(subQtyTotal * (TIER_WEIGHT[subBadge.tier] ?? 0)) }}
+              </td>
               <td class="px-3 py-2 text-red-400">{{ fmt(subGrossTotal) }}</td>
               <td class="px-3 py-2 text-green-400">{{ fmt(subReturnTotal) }}</td>
               <td class="px-3 py-2 font-semibold">{{ fmt(subGrossTotal - subReturnTotal) }}</td>
@@ -718,11 +727,22 @@ const {
               <td class="px-3 py-2 text-gray-500">—</td>
               <td class="px-3 py-2 text-red-400">{{ fmt(totalGross) }}</td>
               <td class="px-3 py-2 text-green-400">{{ fmt(totalReturn) }}</td>
+
               <td class="px-3 py-2 text-yellow-300">{{ fmt(costPerItem) }}</td>
               <td class="px-3 py-2 text-gray-500 border-l border-gray-700">—</td>
+              <td
+                class="px-3 py-2 text-sky-300 border-l border-gray-700 whitespace-nowrap rounded-br-lg"
+              >
+                {{
+                  fmtWeight(
+                    rawQtyTotal * (TIER_WEIGHT[rawBadge.tier] ?? 0) +
+                      (hasSubIngredient ? subQtyTotal * (TIER_WEIGHT[subBadge.tier] ?? 0) : 0),
+                  )
+                }}
+              </td>
               <td class="px-3 py-2 text-red-400">{{ fmt(totalGrossTotal) }}</td>
               <td class="px-3 py-2 text-green-400">{{ fmt(totalReturnTotal) }}</td>
-              <td class="px-3 py-2 text-yellow-300 text-base rounded-br-lg">
+              <td class="px-3 py-2 text-yellow-300 text-base">
                 {{ fmt(totalCost) }}
               </td>
             </tr>

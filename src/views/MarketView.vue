@@ -184,6 +184,18 @@ function sortIndicator(key: SortKey) {
   return sortDir.value === 'asc' ? '↑' : '↓'
 }
 
+const filteredSortedResults = computed(() => {
+  const base = sortedResults.value
+  if (!filterField.value || !filterAge.value) return base
+  const limitMs = filterAge.value * 60 * 1000
+  const field = filterField.value
+  return base.filter((row) => {
+    const date = parseDateStr(row[field])
+    if (!date) return false
+    return Date.now() - date.getTime() <= limitMs
+  })
+})
+
 const sortedResults = computed(() => {
   if (!sortKey.value) return results.value
   const key = sortKey.value
@@ -250,13 +262,15 @@ function toggleAllRefined() {
 }
 
 const refinedTypes = new Set(['METALBAR', 'PLANKS', 'CLOTH', 'LEATHER', 'STONEBLOCK'])
+// Raw resources that don't exist at T1
+const noT1RawTypes = new Set(['ORE', 'FIBER'])
 
 const generatedResourceIds = computed(() => {
   const ids: string[] = []
   for (const type of [...selectedRawTypes.value, ...selectedRefinedTypes.value]) {
     for (const tier of selectedResourceTiers.value) {
-      // Refined resources don't exist at T1
-      if (tier === 1 && refinedTypes.has(type)) continue
+      // Refined resources and some raws don't exist at T1
+      if (tier === 1 && (refinedTypes.has(type) || noT1RawTypes.has(type))) continue
       // T1/T2/T3 and STONEBLOCK have no enchantments; ROCK T4+ only up to .3
       const enchants =
         type === 'STONEBLOCK' || tier <= 3
@@ -286,6 +300,27 @@ function applyResourceSearch() {
 }
 
 // ── End resource quick-select ─────────────────────────────────────────────────
+
+// ── Table freshness filter ───────────────────────────────────────────────────
+type FilterField = 'sell_price_min_date' | 'sell_price_max_date' | 'buy_price_max_date' | null
+type FilterAge = 30 | 360 | 1440 | null
+
+const filterField = ref<FilterField>(null)
+const filterAge = ref<FilterAge>(null)
+
+const filterFieldOptions: { label: string; value: FilterField }[] = [
+  { label: 'Venda Mín.', value: 'sell_price_min_date' },
+  { label: 'Venda Máx.', value: 'sell_price_max_date' },
+  { label: 'Pedido de Compra', value: 'buy_price_max_date' },
+]
+
+const filterAgeOptions: { label: string; value: FilterAge }[] = [
+  { label: '< 30min', value: 30 },
+  { label: '< 6h', value: 360 },
+  { label: '< 24h', value: 1440 },
+]
+
+// ── End table freshness filter ────────────────────────────────────────────────
 
 const SENTINEL_DATE = '0001-01-01'
 
@@ -452,7 +487,12 @@ function dateBgClass(dateStr: string): string {
           <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Localidades</h2>
           <button
             @click="toggleAllLocations"
-            class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors cursor-pointer"
+            :class="[
+              'text-xs transition-colors cursor-pointer',
+              allLocationsSelected
+                ? 'text-red-400 hover:text-red-300'
+                : 'text-yellow-400 hover:text-yellow-300',
+            ]"
           >
             {{ allLocationsSelected ? 'Desmarcar todas' : 'Selecionar todas' }}
           </button>
@@ -554,9 +594,14 @@ function dateBgClass(dateStr: string): string {
               >
               <button
                 @click="toggleAllRaw"
-                class="text-xs text-gray-400 hover:text-yellow-300 transition-colors cursor-pointer"
+                :class="[
+                  'text-xs transition-colors cursor-pointer',
+                  allRawSelected
+                    ? 'text-red-400 hover:text-red-300'
+                    : 'text-yellow-400 hover:text-yellow-300',
+                ]"
               >
-                {{ allRawSelected ? 'Desmarcar todos' : 'Marcar todos' }}
+                {{ allRawSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
               </button>
             </div>
             <label
@@ -582,9 +627,14 @@ function dateBgClass(dateStr: string): string {
               >
               <button
                 @click="toggleAllRefined"
-                class="text-xs text-gray-400 hover:text-blue-300 transition-colors cursor-pointer"
+                :class="[
+                  'text-xs transition-colors cursor-pointer',
+                  allRefinedSelected
+                    ? 'text-red-400 hover:text-red-300'
+                    : 'text-yellow-400 hover:text-yellow-300',
+                ]"
               >
-                {{ allRefinedSelected ? 'Desmarcar todos' : 'Marcar todos' }}
+                {{ allRefinedSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
               </button>
             </div>
             <label
@@ -612,9 +662,14 @@ function dateBgClass(dateStr: string): string {
                 selectedResourceTiers =
                   selectedResourceTiers.length === 8 ? [] : [1, 2, 3, 4, 5, 6, 7, 8]
               "
-              class="text-xs text-gray-400 hover:text-yellow-300 transition-colors cursor-pointer"
+              :class="[
+                'text-xs transition-colors cursor-pointer',
+                selectedResourceTiers.length === 8
+                  ? 'text-red-400 hover:text-red-300'
+                  : 'text-yellow-400 hover:text-yellow-300',
+              ]"
             >
-              {{ selectedResourceTiers.length === 8 ? 'Desmarcar todos' : 'Marcar todos' }}
+              {{ selectedResourceTiers.length === 8 ? 'Desmarcar todos' : 'Selecionar todos' }}
             </button>
           </div>
           <div class="flex flex-wrap gap-x-3 gap-y-1">
@@ -650,9 +705,14 @@ function dateBgClass(dateStr: string): string {
                 selectedResourceEnchants =
                   selectedResourceEnchants.length === 5 ? [] : [0, 1, 2, 3, 4]
               "
-              class="text-xs text-gray-400 hover:text-yellow-300 transition-colors cursor-pointer"
+              :class="[
+                'text-xs transition-colors cursor-pointer',
+                selectedResourceEnchants.length === 5
+                  ? 'text-red-400 hover:text-red-300'
+                  : 'text-yellow-400 hover:text-yellow-300',
+              ]"
             >
-              {{ selectedResourceEnchants.length === 5 ? 'Desmarcar todos' : 'Marcar todos' }}
+              {{ selectedResourceEnchants.length === 5 ? 'Desmarcar todos' : 'Selecionar todos' }}
             </button>
           </div>
           <div class="flex flex-wrap gap-x-4 gap-y-1">
@@ -709,7 +769,87 @@ function dateBgClass(dateStr: string): string {
 
     <!-- Results Table -->
     <div v-if="results.length" class="mt-6 bg-gray-900 rounded-xl p-4">
-      <h2 class="text-lg font-semibold text-yellow-400 mb-3">Resultados</h2>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+        <h2 class="text-lg font-semibold text-yellow-400">Resultados</h2>
+
+        <!-- Freshness filter -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-gray-500 mr-1">Filtrar por:</span>
+
+          <!-- Field toggles -->
+          <div class="flex rounded-lg overflow-hidden border border-gray-700">
+            <button
+              v-for="opt in filterFieldOptions"
+              :key="opt.value!"
+              @click="filterField = filterField === opt.value ? null : opt.value"
+              :class="[
+                'px-2 py-1 text-xs transition-colors cursor-pointer',
+                filterField === opt.value
+                  ? 'bg-yellow-400 text-gray-900 font-semibold'
+                  : 'bg-gray-800 text-gray-400 hover:text-yellow-300',
+              ]"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <!-- Age toggles -->
+          <div class="flex rounded-lg overflow-hidden border border-gray-700">
+            <button
+              v-for="opt in filterAgeOptions"
+              :key="opt.value!"
+              @click="filterAge = filterAge === opt.value ? null : opt.value"
+              :class="[
+                'px-2 py-1 text-xs transition-colors cursor-pointer',
+                filterAge === opt.value
+                  ? 'bg-yellow-400 text-gray-900 font-semibold'
+                  : 'bg-gray-800 text-gray-400 hover:text-yellow-300',
+              ]"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <!-- Clear filter -->
+          <button
+            v-if="filterField || filterAge"
+            @click="((filterField = null), (filterAge = null))"
+            class="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+          >
+            Limpar
+          </button>
+
+          <span v-if="filterField && filterAge" class="text-xs text-gray-500">
+            {{ filteredSortedResults.length }} / {{ sortedResults.length }} linhas
+          </span>
+        </div>
+      </div>
+
+      <!-- Filter hint -->
+      <p class="text-xs text-right text-gray-600 mb-3">
+        <template v-if="!filterField && !filterAge">
+          Selecione um campo e um intervalo de tempo para filtrar os resultados pela data de
+          atualização.
+        </template>
+        <template v-else-if="filterField && !filterAge">
+          Agora selecione um intervalo de tempo para aplicar o filtro.
+        </template>
+        <template v-else-if="!filterField && filterAge">
+          Agora selecione o campo a ser filtrado (Venda Mín., Venda Máx. ou Pedido de Compra).
+        </template>
+        <template v-else>
+          Exibindo apenas registros de
+          <span class="text-gray-400">{{
+            filterFieldOptions.find((o) => o.value === filterField)?.label
+          }}</span>
+          atualizados há
+          <span class="text-gray-400">{{
+            filterAgeOptions.find((o) => o.value === filterAge)?.label.replace('< ', 'menos de ')
+          }}</span
+          >.
+        </template>
+      </p>
+
       <div class="overflow-x-auto">
         <table class="w-full text-sm border-collapse">
           <thead>
@@ -781,7 +921,7 @@ function dateBgClass(dateStr: string): string {
           </thead>
           <tbody>
             <tr
-              v-for="row in sortedResults"
+              v-for="row in filteredSortedResults"
               :key="`${row.item_id}_${row.city}_${row.quality}`"
               class="border-t border-gray-800 hover:bg-gray-800/50 transition-colors"
             >

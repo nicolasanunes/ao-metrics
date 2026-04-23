@@ -154,6 +154,18 @@ export const RAW_QTY: Record<number, number> = {
   8: 5,
 }
 
+// Weight per item in kg, by tier (enchantment does not affect weight)
+export const TIER_WEIGHT: Record<number, number> = {
+  1: 0.15,
+  2: 0.23,
+  3: 0.34,
+  4: 0.51,
+  5: 0.76,
+  6: 1.14,
+  7: 1.71,
+  8: 2.56,
+}
+
 // Item Value (IV) — used for focus cost and nutrition calculation.
 // Stone output is always base (.0); enchantment only applies to non-stone output.
 export const ITEM_VALUE_TABLE: Record<number, Record<number, number>> = {
@@ -256,6 +268,10 @@ export function tierBadge(
 
 export function fmt(n: number): string {
   return n.toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+}
+
+export function fmtWeight(kg: number): string {
+  return kg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg'
 }
 
 export function profitColorClass(n: number | null): string {

@@ -4,10 +4,12 @@ import { storeToRefs } from 'pinia'
 import { Quality, type Item, Location } from '@/types/items'
 import { fetchPrices, type PriceData } from '@/services/marketService'
 import { useItemsStore } from '@/stores/items'
+import { useAnnotationsStore } from '@/stores/annotations'
 import NoteInformation from '@/components/NoteInformation.vue'
 import { tierBadgeClasses } from '@/data/tierColors'
 
 const itemsStore = useItemsStore()
+const annotationsStore = useAnnotationsStore()
 onMounted(() => itemsStore.load())
 
 const itemSearch = ref('')
@@ -244,13 +246,19 @@ const refinedResourceTypes = [
 
 const selectedRawTypes = ref<string[]>([])
 const selectedRefinedTypes = ref<string[]>([])
-const selectedResourceTiers = ref<number[]>([4, 5, 6, 7, 8])
-const selectedResourceEnchants = ref<number[]>([0])
+const selectedRawTiers = ref<number[]>([])
+const selectedRawEnchants = ref<number[]>([0])
+const selectedRefinedTiers = ref<number[]>([])
+const selectedRefinedEnchants = ref<number[]>([0])
 
 const allRawSelected = computed(() => selectedRawTypes.value.length === rawResourceTypes.length)
 const allRefinedSelected = computed(
   () => selectedRefinedTypes.value.length === refinedResourceTypes.length,
 )
+const allRawTiersSelected = computed(() => selectedRawTiers.value.length === 8)
+const allRefinedTiersSelected = computed(() => selectedRefinedTiers.value.length === 8)
+const allRawEnchantsSelected = computed(() => selectedRawEnchants.value.length === 5)
+const allRefinedEnchantsSelected = computed(() => selectedRefinedEnchants.value.length === 5)
 
 function toggleAllRaw() {
   selectedRawTypes.value = allRawSelected.value ? [] : rawResourceTypes.map((r) => r.key)
@@ -260,24 +268,44 @@ function toggleAllRefined() {
     ? []
     : refinedResourceTypes.map((r) => r.key)
 }
+function toggleAllRawTiers() {
+  selectedRawTiers.value = allRawTiersSelected.value ? [] : [1, 2, 3, 4, 5, 6, 7, 8]
+}
+function toggleAllRefinedTiers() {
+  selectedRefinedTiers.value = allRefinedTiersSelected.value ? [] : [1, 2, 3, 4, 5, 6, 7, 8]
+}
+function toggleAllRawEnchants() {
+  selectedRawEnchants.value = allRawEnchantsSelected.value ? [] : [0, 1, 2, 3, 4]
+}
+function toggleAllRefinedEnchants() {
+  selectedRefinedEnchants.value = allRefinedEnchantsSelected.value ? [] : [0, 1, 2, 3, 4]
+}
 
-const refinedTypes = new Set(['METALBAR', 'PLANKS', 'CLOTH', 'LEATHER', 'STONEBLOCK'])
 // Raw resources that don't exist at T1
 const noT1RawTypes = new Set(['ORE', 'FIBER'])
 
 const generatedResourceIds = computed(() => {
   const ids: string[] = []
-  for (const type of [...selectedRawTypes.value, ...selectedRefinedTypes.value]) {
-    for (const tier of selectedResourceTiers.value) {
-      // Refined resources and some raws don't exist at T1
-      if (tier === 1 && (refinedTypes.has(type) || noT1RawTypes.has(type))) continue
-      // T1/T2/T3 and STONEBLOCK have no enchantments; ROCK T4+ only up to .3
+  // Raw types use raw tiers + raw enchants
+  for (const type of selectedRawTypes.value) {
+    for (const tier of selectedRawTiers.value) {
+      if (tier === 1 && noT1RawTypes.has(type)) continue
       const enchants =
-        type === 'STONEBLOCK' || tier <= 3
+        tier <= 3
           ? [0]
           : type === 'ROCK'
-            ? selectedResourceEnchants.value.filter((e) => e <= 3)
-            : selectedResourceEnchants.value
+            ? selectedRawEnchants.value.filter((e) => e <= 3)
+            : selectedRawEnchants.value
+      for (const enchant of enchants) {
+        ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}@${enchant}`)
+      }
+    }
+  }
+  // Refined types use refined tiers + refined enchants
+  for (const type of selectedRefinedTypes.value) {
+    for (const tier of selectedRefinedTiers.value) {
+      if (tier === 1) continue // refined never at T1
+      const enchants = type === 'STONEBLOCK' || tier <= 3 ? [0] : selectedRefinedEnchants.value
       for (const enchant of enchants) {
         ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}@${enchant}`)
       }
@@ -355,6 +383,24 @@ function dateBgClass(dateStr: string): string {
   if (hoursAgo < 6) return 'bg-green-900/60 text-green-300'
   if (hoursAgo < 24) return 'bg-yellow-900/60 text-yellow-300'
   return 'bg-red-900/60 text-red-300'
+}
+
+const ANNOTATION_LABELS: Record<'sell_price_min' | 'sell_price_max' | 'buy_price_max', string> = {
+  sell_price_min: 'Venda Mín.',
+  sell_price_max: 'Venda Máx.',
+  buy_price_max: 'Pedido de Compra',
+}
+
+function addAnnotation(
+  row: PriceData,
+  field: 'sell_price_min' | 'sell_price_max' | 'buy_price_max',
+) {
+  const price = row[field]
+  if (!price) return
+  const badge = tierBadge(row.item_id)
+  const tierLabel = badge.subtier > 0 ? `T${badge.tier}.${badge.subtier}` : `T${badge.tier}`
+  const note = `${tierLabel} ${itemName(row.item_id)}: ${price.toLocaleString('pt-BR')} em ${row.city} (${ANNOTATION_LABELS[field]})`
+  annotationsStore.notes = annotationsStore.notes ? annotationsStore.notes + '\n' + note : note
 }
 </script>
 
@@ -460,7 +506,7 @@ function dateBgClass(dateStr: string): string {
           :disabled="!isValid || loading"
           class="absolute bottom-4 left-4 right-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer bg-yellow-400 text-gray-900 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {{ loading ? 'Buscando...' : 'Atualizar preços' }}
+          {{ loading ? 'Buscando...' : 'Buscar preços' }}
         </button>
       </div>
 
@@ -584,10 +630,10 @@ function dateBgClass(dateStr: string): string {
 
       <!-- Collapsible body -->
       <div v-if="resourceCardOpen" class="px-4 p-4">
-        <!-- Resource types -->
+        <!-- Raw + Refined columns, each with their own tiers & enchants -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <!-- Raw Resources -->
-          <div>
+          <!-- ── Raw Resources ── -->
+          <div class="bg-gray-800/40 rounded-lg p-3">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-bold text-yellow-400 uppercase tracking-wider"
                 >Recursos Brutos</span
@@ -617,10 +663,96 @@ function dateBgClass(dateStr: string): string {
               />
               {{ rt.label }}
             </label>
+
+            <!-- Tiers (raw) -->
+            <div class="mt-3 pt-3 border-t border-gray-700">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
+                  >Tiers</span
+                >
+                <button
+                  @click="toggleAllRawTiers"
+                  :class="[
+                    'text-xs transition-colors cursor-pointer',
+                    allRawTiersSelected
+                      ? 'text-red-400 hover:text-red-300'
+                      : 'text-yellow-400 hover:text-yellow-300',
+                  ]"
+                >
+                  {{ allRawTiersSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-x-2 gap-y-1">
+                <label
+                  v-for="tier in [1, 2, 3, 4, 5, 6, 7, 8]"
+                  :key="tier"
+                  class="flex items-center gap-1 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="tier"
+                    v-model="selectedRawTiers"
+                    class="accent-yellow-400"
+                  />
+                  <span
+                    class="text-xs font-bold px-1.5 py-0.5 rounded"
+                    :class="tierBadge(`T${tier}_ORE`).bg"
+                    :style="{ color: tierBadge(`T${tier}_ORE`).tierColor }"
+                    >T{{ tier }}</span
+                  >
+                </label>
+              </div>
+            </div>
+
+            <!-- Enchantments (raw) -->
+            <div class="mt-3 pt-3 border-t border-gray-700">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
+                  >Encantamentos</span
+                >
+                <button
+                  @click="toggleAllRawEnchants"
+                  :class="[
+                    'text-xs transition-colors cursor-pointer',
+                    allRawEnchantsSelected
+                      ? 'text-red-400 hover:text-red-300'
+                      : 'text-yellow-400 hover:text-yellow-300',
+                  ]"
+                >
+                  {{ allRawEnchantsSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-x-3 gap-y-1">
+                <label
+                  class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="0"
+                    v-model="selectedRawEnchants"
+                    class="accent-yellow-400"
+                  />
+                  Base
+                </label>
+                <label
+                  v-for="e in [1, 2, 3, 4]"
+                  :key="e"
+                  class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="e"
+                    v-model="selectedRawEnchants"
+                    class="accent-yellow-400"
+                  />
+                  .{{ e }}
+                </label>
+              </div>
+            </div>
           </div>
 
-          <!-- Refined Resources -->
-          <div>
+          <!-- ── Refined Resources ── -->
+          <div class="bg-gray-800/40 rounded-lg p-3">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-bold text-blue-400 uppercase tracking-wider"
                 >Recursos Refinados</span
@@ -650,96 +782,92 @@ function dateBgClass(dateStr: string): string {
               />
               {{ rt.label }}
             </label>
-          </div>
-        </div>
 
-        <!-- Tiers -->
-        <div class="mb-3">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tiers</span>
-            <button
-              @click="
-                selectedResourceTiers =
-                  selectedResourceTiers.length === 8 ? [] : [1, 2, 3, 4, 5, 6, 7, 8]
-              "
-              :class="[
-                'text-xs transition-colors cursor-pointer',
-                selectedResourceTiers.length === 8
-                  ? 'text-red-400 hover:text-red-300'
-                  : 'text-yellow-400 hover:text-yellow-300',
-              ]"
-            >
-              {{ selectedResourceTiers.length === 8 ? 'Desmarcar todos' : 'Selecionar todos' }}
-            </button>
-          </div>
-          <div class="flex flex-wrap gap-x-3 gap-y-1">
-            <label
-              v-for="tier in [1, 2, 3, 4, 5, 6, 7, 8]"
-              :key="tier"
-              class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
-            >
-              <input
-                type="checkbox"
-                :value="tier"
-                v-model="selectedResourceTiers"
-                class="accent-yellow-400"
-              />
-              <span
-                class="text-xs font-bold px-1.5 py-0.5 rounded"
-                :class="tierBadge(`T${tier}_ORE`).bg"
-                :style="{ color: tierBadge(`T${tier}_ORE`).tierColor }"
-                >T{{ tier }}</span
-              >
-            </label>
-          </div>
-        </div>
+            <!-- Tiers (refined) -->
+            <div class="mt-3 pt-3 border-t border-gray-700">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
+                  >Tiers</span
+                >
+                <button
+                  @click="toggleAllRefinedTiers"
+                  :class="[
+                    'text-xs transition-colors cursor-pointer',
+                    allRefinedTiersSelected
+                      ? 'text-red-400 hover:text-red-300'
+                      : 'text-yellow-400 hover:text-yellow-300',
+                  ]"
+                >
+                  {{ allRefinedTiersSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-x-2 gap-y-1">
+                <label
+                  v-for="tier in [1, 2, 3, 4, 5, 6, 7, 8]"
+                  :key="tier"
+                  class="flex items-center gap-1 cursor-pointer text-sm text-gray-300 hover:text-blue-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="tier"
+                    v-model="selectedRefinedTiers"
+                    class="accent-blue-400"
+                  />
+                  <span
+                    class="text-xs font-bold px-1.5 py-0.5 rounded"
+                    :class="tierBadge(`T${tier}_ORE`).bg"
+                    :style="{ color: tierBadge(`T${tier}_ORE`).tierColor }"
+                    >T{{ tier }}</span
+                  >
+                </label>
+              </div>
+            </div>
 
-        <!-- Enchantments -->
-        <div class="mb-4">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
-              >Encantamentos</span
-            >
-            <button
-              @click="
-                selectedResourceEnchants =
-                  selectedResourceEnchants.length === 5 ? [] : [0, 1, 2, 3, 4]
-              "
-              :class="[
-                'text-xs transition-colors cursor-pointer',
-                selectedResourceEnchants.length === 5
-                  ? 'text-red-400 hover:text-red-300'
-                  : 'text-yellow-400 hover:text-yellow-300',
-              ]"
-            >
-              {{ selectedResourceEnchants.length === 5 ? 'Desmarcar todos' : 'Selecionar todos' }}
-            </button>
-          </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1">
-            <label
-              class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
-            >
-              <input
-                type="checkbox"
-                :value="0"
-                v-model="selectedResourceEnchants"
-                class="accent-yellow-400"
-              />
-              Base
-            </label>
-            <label
-              v-for="e in [1, 2, 3, 4]"
-              :key="e"
-              class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-yellow-300 transition-colors"
-            >
-              <input
-                type="checkbox"
-                :value="e"
-                v-model="selectedResourceEnchants"
-                class="accent-yellow-400"
-              />
-              .{{ e }}
-            </label>
+            <!-- Enchantments (refined) -->
+            <div class="mt-3 pt-3 border-t border-gray-700">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
+                  >Encantamentos</span
+                >
+                <button
+                  @click="toggleAllRefinedEnchants"
+                  :class="[
+                    'text-xs transition-colors cursor-pointer',
+                    allRefinedEnchantsSelected
+                      ? 'text-red-400 hover:text-red-300'
+                      : 'text-yellow-400 hover:text-yellow-300',
+                  ]"
+                >
+                  {{ allRefinedEnchantsSelected ? 'Desmarcar todos' : 'Selecionar todos' }}
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-x-3 gap-y-1">
+                <label
+                  class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-blue-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="0"
+                    v-model="selectedRefinedEnchants"
+                    class="accent-blue-400"
+                  />
+                  Base
+                </label>
+                <label
+                  v-for="e in [1, 2, 3, 4]"
+                  :key="e"
+                  class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-300 hover:text-blue-300 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    :value="e"
+                    v-model="selectedRefinedEnchants"
+                    class="accent-blue-400"
+                  />
+                  .{{ e }}
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -941,15 +1069,57 @@ function dateBgClass(dateStr: string): string {
               </td>
               <td class="px-3 py-2">{{ row.city }}</td>
               <td class="px-3 py-2">{{ qualityLabel[row.quality] ?? row.quality }}</td>
-              <td class="px-3 py-2 text-green-400">{{ row.sell_price_min.toLocaleString() }}</td>
+              <td class="px-3 py-2 text-green-400">
+                <span
+                  v-if="row.sell_price_min > 0"
+                  class="relative group cursor-pointer hover:text-green-300 transition-colors"
+                  @click="addAnnotation(row, 'sell_price_min')"
+                >
+                  {{ row.sell_price_min.toLocaleString() }}
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-gray-300 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100] shadow-lg"
+                  >
+                    📌 Clique para anotar no baú de anotações
+                  </span>
+                </span>
+                <span v-else class="text-gray-600">0</span>
+              </td>
               <td class="px-3 py-2 text-xs rounded" :class="dateBgClass(row.sell_price_min_date)">
                 {{ formatDate(row.sell_price_min_date) }}
               </td>
-              <td class="px-3 py-2 text-green-400">{{ row.sell_price_max.toLocaleString() }}</td>
+              <td class="px-3 py-2 text-green-400">
+                <span
+                  v-if="row.sell_price_max > 0"
+                  class="relative group cursor-pointer hover:text-green-300 transition-colors"
+                  @click="addAnnotation(row, 'sell_price_max')"
+                >
+                  {{ row.sell_price_max.toLocaleString() }}
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-gray-300 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100] shadow-lg"
+                  >
+                    📌 Clique para anotar no baú de anotações
+                  </span>
+                </span>
+                <span v-else class="text-gray-600">0</span>
+              </td>
               <td class="px-3 py-2 text-xs rounded" :class="dateBgClass(row.sell_price_max_date)">
                 {{ formatDate(row.sell_price_max_date) }}
               </td>
-              <td class="px-3 py-2 text-blue-400">{{ row.buy_price_max.toLocaleString() }}</td>
+              <td class="px-3 py-2 text-blue-400">
+                <span
+                  v-if="row.buy_price_max > 0"
+                  class="relative group cursor-pointer hover:text-blue-300 transition-colors"
+                  @click="addAnnotation(row, 'buy_price_max')"
+                >
+                  {{ row.buy_price_max.toLocaleString() }}
+                  <span
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-xs text-gray-300 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-[100] shadow-lg"
+                  >
+                    📌 Clique para anotar no baú de anotações
+                  </span>
+                </span>
+                <span v-else class="text-gray-600">0</span>
+              </td>
               <td class="px-3 py-2 text-xs rounded" :class="dateBgClass(row.buy_price_max_date)">
                 {{ formatDate(row.buy_price_max_date) }}
               </td>

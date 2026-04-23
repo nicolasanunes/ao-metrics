@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { useRefineCalculator } from '@/composables/useRefineCalculator'
 import {
   MATERIAL_OPTIONS,
@@ -12,6 +13,7 @@ import {
   marginColorClass,
   marginBgClass,
 } from '@/data/refineData'
+import { useAnnotationsStore } from '@/stores/annotations'
 
 const {
   // State
@@ -93,6 +95,64 @@ const {
   totalProfit,
   profitMarginPct,
 } = useRefineCalculator()
+
+const annotationsStore = useAnnotationsStore()
+
+// ── Item ID helpers (matches IDs stored by MarketView addAnnotation) ─────────
+const RAW_TYPE_KEY: Record<string, string> = {
+  wood: 'WOOD',
+  hide: 'HIDE',
+  ore: 'ORE',
+  stone: 'ROCK',
+  fiber: 'FIBER',
+}
+const SUB_TYPE_KEY: Record<string, string> = {
+  wood: 'PLANKS',
+  hide: 'LEATHER',
+  ore: 'METALBAR',
+  stone: 'STONEBLOCK',
+  fiber: 'CLOTH',
+}
+
+// Reconstructed raw item ID — e.g. "T5_HIDE" or "T5_HIDE@1"
+const rawItemId = computed(() => {
+  const typeKey = RAW_TYPE_KEY[material.value]
+  const enc = rawBadge.value.subtier
+  return enc > 0
+    ? `T${rawBadge.value.tier}_${typeKey}@${enc}`
+    : `T${rawBadge.value.tier}_${typeKey}`
+})
+// Sub-ingredient item ID — e.g. "T4_LEATHER"
+const subItemId = computed(() => {
+  const typeKey = SUB_TYPE_KEY[material.value]
+  const enc = subBadge.value.subtier
+  return enc > 0
+    ? `T${subBadge.value.tier}_${typeKey}@${enc}`
+    : `T${subBadge.value.tier}_${typeKey}`
+})
+
+const rawEntries = computed(() => annotationsStore.entriesForItem(rawItemId.value))
+const subEntries = computed(() => annotationsStore.entriesForItem(subItemId.value))
+
+// Refined item ID — e.g. "T5_LEATHER" or "T5_LEATHER@1"
+const refinedItemId = computed(() => {
+  const typeKey = SUB_TYPE_KEY[material.value]
+  const enc = refinedBadge.value.subtier
+  return enc > 0
+    ? `T${refinedBadge.value.tier}_${typeKey}@${enc}`
+    : `T${refinedBadge.value.tier}_${typeKey}`
+})
+const sellEntries = computed(() => annotationsStore.entriesForItem(refinedItemId.value))
+
+const showRawChest = ref(false)
+const showSubChest = ref(false)
+const showSellChest = ref(false)
+
+const PRICE_FIELD_LABEL: Record<string, string> = {
+  sell_price_min: 'Venda Mín.',
+  sell_price_max: 'Venda Máx.',
+  buy_price_max: 'Compra',
+}
 </script>
 
 <template>
@@ -449,6 +509,39 @@ const {
                 >
                 {{ rawDisplayName }}
               </div>
+              <!-- Chest picker trigger -->
+              <div class="relative mb-1.5 ml-auto">
+                <button
+                  v-if="rawEntries.length"
+                  @click="showRawChest = !showRawChest"
+                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Usar valor do baú de anotações"
+                >
+                  🪙 Baú <span class="font-bold">{{ rawEntries.length }}</span>
+                </button>
+                <div
+                  v-if="showRawChest && rawEntries.length"
+                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                >
+                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                    Selecionar valor anotado
+                  </p>
+                  <button
+                    v-for="(entry, i) in rawEntries"
+                    :key="i"
+                    @click="((rawPrice = entry.price), (showRawChest = false))"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                  >
+                    <span class="text-xs text-gray-400"
+                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                    >
+                    <span
+                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                      >{{ entry.price.toLocaleString('pt-BR') }}</span
+                    >
+                  </button>
+                </div>
+              </div>
             </div>
             <input
               type="number"
@@ -471,6 +564,39 @@ const {
                   ></span
                 >
                 {{ subRefinedDisplayName }}
+              </div>
+              <!-- Chest picker trigger (sub) -->
+              <div class="relative mb-1.5 ml-auto">
+                <button
+                  v-if="subEntries.length"
+                  @click="showSubChest = !showSubChest"
+                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Usar valor do baú de anotações"
+                >
+                  🪙 Baú <span class="font-bold">{{ subEntries.length }}</span>
+                </button>
+                <div
+                  v-if="showSubChest && subEntries.length"
+                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                >
+                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                    Selecionar valor anotado
+                  </p>
+                  <button
+                    v-for="(entry, i) in subEntries"
+                    :key="i"
+                    @click="((subPrice = entry.price), (showSubChest = false))"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                  >
+                    <span class="text-xs text-gray-400"
+                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                    >
+                    <span
+                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                      >{{ entry.price.toLocaleString('pt-BR') }}</span
+                    >
+                  </button>
+                </div>
               </div>
             </div>
             <input
@@ -511,6 +637,39 @@ const {
                 {{ refinedDisplayName }}
               </div>
               <span class="text-gray-600 text-xs mb-1">(opcional)</span>
+              <!-- Chest picker trigger (sell) -->
+              <div class="relative mb-1.5 ml-auto">
+                <button
+                  v-if="sellEntries.length"
+                  @click="showSellChest = !showSellChest"
+                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Usar valor do baú de anotações"
+                >
+                  🪙 Baú <span class="font-bold">{{ sellEntries.length }}</span>
+                </button>
+                <div
+                  v-if="showSellChest && sellEntries.length"
+                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                >
+                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                    Selecionar valor anotado
+                  </p>
+                  <button
+                    v-for="(entry, i) in sellEntries"
+                    :key="i"
+                    @click="((sellPrice = entry.price), (showSellChest = false))"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                  >
+                    <span class="text-xs text-gray-400"
+                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                    >
+                    <span
+                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                      >{{ entry.price.toLocaleString('pt-BR') }}</span
+                    >
+                  </button>
+                </div>
+              </div>
             </div>
             <input
               type="number"

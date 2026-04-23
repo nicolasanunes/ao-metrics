@@ -385,12 +385,6 @@ function dateBgClass(dateStr: string): string {
   return 'bg-red-900/60 text-red-300'
 }
 
-const ANNOTATION_LABELS: Record<'sell_price_min' | 'sell_price_max' | 'buy_price_max', string> = {
-  sell_price_min: 'Venda Mín.',
-  sell_price_max: 'Venda Máx.',
-  buy_price_max: 'Pedido de Compra',
-}
-
 function addAnnotation(
   row: PriceData,
   field: 'sell_price_min' | 'sell_price_max' | 'buy_price_max',
@@ -399,8 +393,15 @@ function addAnnotation(
   if (!price) return
   const badge = tierBadge(row.item_id)
   const tierLabel = badge.subtier > 0 ? `T${badge.tier}.${badge.subtier}` : `T${badge.tier}`
-  const note = `${tierLabel} ${itemName(row.item_id)}: ${price.toLocaleString('pt-BR')} em ${row.city} (${ANNOTATION_LABELS[field]})`
-  annotationsStore.notes = annotationsStore.notes ? annotationsStore.notes + '\n' + note : note
+  const label = `${tierLabel} ${itemName(row.item_id)}`
+  annotationsStore.addEntry({
+    itemId: row.item_id,
+    label,
+    price,
+    priceField: field,
+    city: row.city,
+    savedAt: Date.now(),
+  })
 }
 </script>
 

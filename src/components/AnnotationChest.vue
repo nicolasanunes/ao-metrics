@@ -2,6 +2,12 @@
 import { ref } from 'vue'
 import { useAnnotationsStore } from '@/stores/annotations'
 
+const FIELD_LABELS: Record<string, string> = {
+  sell_price_min: 'Venda Mín.',
+  sell_price_max: 'Venda Máx.',
+  buy_price_max: 'Pedido de Compra',
+}
+
 const store = useAnnotationsStore()
 const visible = ref(false)
 const shaking = ref(false)
@@ -50,6 +56,31 @@ function onParchmentOpened() {
 
         <!-- Divider -->
         <div class="parchment-divider mb-3" />
+
+        <!-- Structured entries -->
+        <div v-if="store.entries.length > 0" class="mb-2">
+          <p class="entries-label text-xs uppercase tracking-widest mb-2">📌 Preços anotados</p>
+          <div
+            v-for="(entry, i) in store.entries"
+            :key="i"
+            class="entry-chip flex items-start justify-between gap-2 px-2 py-1 mb-1 rounded"
+            @click.stop
+          >
+            <span class="entry-text text-xs leading-snug flex-1">
+              {{ entry.label }}:<br />
+              {{ entry.price.toLocaleString('pt-BR') }} em {{ entry.city }}
+              <em>({{ FIELD_LABELS[entry.priceField] }})</em>
+            </span>
+            <button
+              class="entry-delete flex-shrink-0 mt-0.5"
+              title="Remover anotação"
+              @click.stop="store.removeEntry(i)"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="parchment-divider mt-2 mb-3" />
+        </div>
 
         <!-- Notes textarea -->
         <textarea
@@ -119,6 +150,39 @@ function onParchmentOpened() {
 }
 .parchment-divider::after {
   right: 8%;
+}
+
+/* Entries label */
+.entries-label {
+  color: rgba(90, 52, 12, 0.65);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* Entry chip */
+.entry-chip {
+  background: rgba(90, 52, 12, 0.07);
+  border: 1px solid rgba(90, 52, 12, 0.18);
+}
+
+.entry-text {
+  color: #1e0c02;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.entry-delete {
+  color: #8b1a1a;
+  font-size: 0.75rem;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.entry-delete:hover {
+  opacity: 1;
 }
 
 /* Notes textarea */

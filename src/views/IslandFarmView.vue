@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import {
   useFarmingCalculator,
   CROP_OPTIONS,
@@ -9,6 +10,27 @@ import {
   marginColorClass,
   marginBgClass,
 } from '@/composables/useFarmingCalculator'
+import { useAnnotationsStore } from '@/stores/annotations'
+
+const annotationsStore = useAnnotationsStore()
+
+const PRICE_FIELD_LABEL: Record<string, string> = {
+  sell_price_min: 'Venda Mín.',
+  sell_price_max: 'Venda Máx.',
+  buy_price_max: 'Compra',
+}
+
+// Maps CropKey to the base ID segment used in items.json
+const CROP_ID_KEY: Record<string, string> = {
+  carrot: 'CARROT',
+  bean: 'BEAN',
+  wheat: 'WHEAT',
+  turnip: 'TURNIP',
+  cabbage: 'CABBAGE',
+  potato: 'POTATO',
+  corn: 'CORN',
+  pumpkin: 'PUMPKIN',
+}
 
 const {
   // State
@@ -55,6 +77,23 @@ const {
   restockCostTotal,
   netProfitAfterRestockTotal,
 } = useFarmingCalculator()
+
+const cropItemId = computed(() => {
+  const key = CROP_ID_KEY[crop.value]
+  return `T${cropData.value.tier}_${key}`
+})
+const seedItemId = computed(() => {
+  const key = CROP_ID_KEY[crop.value]
+  return `T${cropData.value.tier}_FARM_${key}_SEED`
+})
+
+const cropEntries = computed(() => annotationsStore.entriesForItem(cropItemId.value))
+const seedEntries = computed(() => annotationsStore.entriesForItem(seedItemId.value))
+const wormEntries = computed(() => annotationsStore.entriesForItem('T1_WORM'))
+
+const showCropChest = ref(false)
+const showSeedChest = ref(false)
+const showWormChest = ref(false)
 </script>
 
 <template>
@@ -322,6 +361,38 @@ const {
                 </span>
                 {{ cropData.name }}
               </div>
+              <div class="relative mb-1.5 ml-auto">
+                <button
+                  v-if="cropEntries.length"
+                  @click="showCropChest = !showCropChest"
+                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Usar valor do baú de anotações"
+                >
+                  🪙 Baú <span class="font-bold">{{ cropEntries.length }}</span>
+                </button>
+                <div
+                  v-if="showCropChest && cropEntries.length"
+                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                >
+                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                    Selecionar valor anotado
+                  </p>
+                  <button
+                    v-for="(entry, i) in cropEntries"
+                    :key="i"
+                    @click="((priceCrop = entry.price), (showCropChest = false))"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                  >
+                    <span class="text-xs text-gray-400"
+                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                    >
+                    <span
+                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                      >{{ entry.price.toLocaleString('pt-BR') }}</span
+                    >
+                  </button>
+                </div>
+              </div>
             </div>
             <input
               type="number"
@@ -345,6 +416,38 @@ const {
                 </span>
                 {{ cropData.seedName }}
               </div>
+              <div class="relative mb-1.5 ml-auto">
+                <button
+                  v-if="seedEntries.length"
+                  @click="showSeedChest = !showSeedChest"
+                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Usar valor do baú de anotações"
+                >
+                  🪙 Baú <span class="font-bold">{{ seedEntries.length }}</span>
+                </button>
+                <div
+                  v-if="showSeedChest && seedEntries.length"
+                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                >
+                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                    Selecionar valor anotado
+                  </p>
+                  <button
+                    v-for="(entry, i) in seedEntries"
+                    :key="i"
+                    @click="((priceSeed = entry.price), (showSeedChest = false))"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                  >
+                    <span class="text-xs text-gray-400"
+                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                    >
+                    <span
+                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                      >{{ entry.price.toLocaleString('pt-BR') }}</span
+                    >
+                  </button>
+                </div>
+              </div>
             </div>
             <input
               type="number"
@@ -364,6 +467,38 @@ const {
                 Minhoca
               </div>
               <span class="text-gray-600 text-xs mb-1">(opcional)</span>
+              <div class="relative mb-1.5 ml-auto">
+                <button
+                  v-if="wormEntries.length"
+                  @click="showWormChest = !showWormChest"
+                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Usar valor do baú de anotações"
+                >
+                  🪙 Baú <span class="font-bold">{{ wormEntries.length }}</span>
+                </button>
+                <div
+                  v-if="showWormChest && wormEntries.length"
+                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                >
+                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                    Selecionar valor anotado
+                  </p>
+                  <button
+                    v-for="(entry, i) in wormEntries"
+                    :key="i"
+                    @click="((priceEarthworm = entry.price), (showWormChest = false))"
+                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                  >
+                    <span class="text-xs text-gray-400"
+                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                    >
+                    <span
+                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                      >{{ entry.price.toLocaleString('pt-BR') }}</span
+                    >
+                  </button>
+                </div>
+              </div>
             </div>
             <input
               type="number"

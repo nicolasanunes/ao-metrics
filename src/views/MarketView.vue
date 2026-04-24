@@ -59,7 +59,7 @@ const filteredItems = computed(() => {
       const subB = b.id.includes('@') ? Number(b.id.split('@')[1]) : 0
       return subA - subB
     })
-    .slice(0, 30)
+    .slice(0, 100)
 })
 
 function addItem(id: string) {
@@ -297,7 +297,7 @@ const generatedResourceIds = computed(() => {
             ? selectedRawEnchants.value.filter((e) => e <= 3)
             : selectedRawEnchants.value
       for (const enchant of enchants) {
-        ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}@${enchant}`)
+        ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}_LEVEL${enchant}@${enchant}`)
       }
     }
   }
@@ -307,7 +307,7 @@ const generatedResourceIds = computed(() => {
       if (tier === 1) continue // refined never at T1
       const enchants = type === 'STONEBLOCK' || tier <= 3 ? [0] : selectedRefinedEnchants.value
       for (const enchant of enchants) {
-        ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}@${enchant}`)
+        ids.push(enchant === 0 ? `T${tier}_${type}` : `T${tier}_${type}_LEVEL${enchant}@${enchant}`)
       }
     }
   }

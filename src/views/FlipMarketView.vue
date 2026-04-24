@@ -79,10 +79,10 @@ const selectedTiers = ref<number[]>([6, 7, 8])
 
 const enchantmentOptions = [
   { label: 'Nenhum', value: 0 },
-  { label: 'Encant. 1', value: 1 },
-  { label: 'Encant. 2', value: 2 },
-  { label: 'Encant. 3', value: 3 },
-  { label: 'Encant. 4', value: 4 },
+  { label: '.1', value: 1 },
+  { label: '.2', value: 2 },
+  { label: '.3', value: 3 },
+  { label: '.4', value: 4 },
 ]
 
 const selectedEnchantments = ref<number[]>([0, 1, 2, 3, 4])
@@ -185,19 +185,43 @@ interface FlipRow {
 
 const SENTINEL_DATE = '0001-01-01'
 
+type FilterAge = 15 | 30 | 360 | null
+const filterAge = ref<FilterAge>(null)
+
+const filterAgeOptions: { label: string; value: FilterAge }[] = [
+  { label: '< 15min', value: 15 },
+  { label: '< 30min', value: 30 },
+  { label: '< 6h', value: 360 },
+]
+
+function parseDateStr(dateStr: string): Date | null {
+  if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return null
+  const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
+  const date = new Date(normalized)
+  return isNaN(date.getTime()) ? null : date
+}
+
 function formatDate(dateStr: string) {
   if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return '-'
   const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
   const date = new Date(normalized)
   if (isNaN(date.getTime())) return '-'
-  return date.toLocaleString('pt-BR', { timeZone: 'UTC' })
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 0) return 'Agora'
+  const totalMin = Math.floor(diffMs / 60000)
+  if (totalMin < 1) return 'Agora'
+  const days = Math.floor(totalMin / 1440)
+  const hours = Math.floor((totalMin % 1440) / 60)
+  const mins = totalMin % 60
+  if (days > 0) return `Há ${days}d ${hours > 0 ? `${hours}h` : ''}`.trimEnd()
+  if (hours > 0 && mins > 0) return `Há ${hours}h ${mins}min`
+  if (hours > 0) return `Há ${hours}h`
+  return `Há ${mins}min`
 }
 
 function dateBgClass(dateStr: string): string {
-  if (!dateStr || dateStr.startsWith(SENTINEL_DATE)) return ''
-  const normalized = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr : dateStr + 'Z'
-  const date = new Date(normalized)
-  if (isNaN(date.getTime())) return ''
+  const date = parseDateStr(dateStr)
+  if (!date) return ''
   const hoursAgo = (Date.now() - date.getTime()) / 1000 / 3600
   if (hoursAgo < 0.5) return 'bg-blue-900/60 text-blue-300'
   if (hoursAgo < 6) return 'bg-green-900/60 text-green-300'
@@ -211,6 +235,7 @@ const qualityLabel: Record<number, string> = Object.fromEntries(
 
 const onlyProfitable = ref(true)
 const minProfitPct = ref<number | null>(null)
+const hasPremium = ref(true)
 
 const flipRows = computed<FlipRow[]>(() => {
   const map = new Map<string, FlipRow>()
@@ -250,15 +275,17 @@ const flipRows = computed<FlipRow[]>(() => {
 function profit(row: FlipRow): number | null {
   if (!row.source || !row.blackMarket) return null
   if (row.source.sell_price_min === 0 || row.blackMarket.buy_price_max === 0) return null
-  return row.blackMarket.buy_price_max - row.source.sell_price_min
+  const taxRate = hasPremium.value ? 0.04 : 0.08
+  const netBmPrice = row.blackMarket.buy_price_max * (1 - taxRate)
+  return netBmPrice - row.source.sell_price_min
 }
 
 function profitPct(row: FlipRow): number | null {
   if (!row.source || !row.blackMarket) return null
   if (row.source.sell_price_min === 0 || row.blackMarket.buy_price_max === 0) return null
-  return (
-    ((row.blackMarket.buy_price_max - row.source.sell_price_min) / row.source.sell_price_min) * 100
-  )
+  const taxRate = hasPremium.value ? 0.04 : 0.08
+  const netBmPrice = row.blackMarket.buy_price_max * (1 - taxRate)
+  return ((netBmPrice - row.source.sell_price_min) / row.source.sell_price_min) * 100
 }
 
 type SortKey = 'item_label' | 'quality' | 'source_price' | 'bm_price' | 'profit' | 'profit_pct'
@@ -314,14 +341,26 @@ const sortedFlipRows = computed(() => {
   })
 })
 
-const computedRows = computed(() =>
-  sortedFlipRows.value.map((row) => ({
+const computedRows = computed(() => {
+  let rows = sortedFlipRows.value
+  if (filterAge.value !== null) {
+    const limitMs = filterAge.value * 60 * 1000
+    rows = rows.filter((row) => {
+      const sourceDate = parseDateStr(row.source!.sell_price_min_date)
+      const bmDate = parseDateStr(row.blackMarket!.buy_price_max_date)
+      if (!sourceDate || !bmDate) return false
+      return (
+        Date.now() - sourceDate.getTime() <= limitMs && Date.now() - bmDate.getTime() <= limitMs
+      )
+    })
+  }
+  return rows.map((row) => ({
     ...row,
     badge: tierBadge(row.item_id),
     profitVal: profit(row),
     profitPctVal: profitPct(row),
-  })),
-)
+  }))
+})
 </script>
 
 <template>
@@ -567,7 +606,7 @@ const computedRows = computed(() =>
         <h2 class="text-lg font-semibold text-yellow-400">
           Comparativo de Preços
           <span class="text-sm text-gray-400 font-normal ml-2"
-            >({{ sortedFlipRows.length }} itens)</span
+            >({{ computedRows.length }} itens)</span
           >
         </h2>
         <label
@@ -575,6 +614,15 @@ const computedRows = computed(() =>
         >
           <input type="checkbox" v-model="onlyProfitable" class="accent-yellow-400" />
           Somente lucrativos
+        </label>
+        <label
+          class="flex items-center gap-2 text-sm cursor-pointer hover:text-yellow-300 transition-colors"
+        >
+          <input type="checkbox" v-model="hasPremium" class="accent-yellow-400" />
+          <span
+            >Premium
+            <span class="text-xs text-gray-500">(taxa {{ hasPremium ? '4%' : '8%' }})</span></span
+          >
         </label>
         <div class="flex items-center gap-2 text-sm">
           <span class="text-gray-400">Lucro mín. (%)</span>
@@ -585,6 +633,24 @@ const computedRows = computed(() =>
             placeholder="0"
             class="w-20 bg-gray-800 text-gray-100 rounded-lg px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-yellow-400"
           />
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-gray-400">Atualização</span>
+          <div class="flex gap-1">
+            <button
+              v-for="opt in filterAgeOptions"
+              :key="String(opt.value)"
+              @click="filterAge = filterAge === opt.value ? null : opt.value"
+              :class="[
+                'px-2 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer',
+                filterAge === opt.value
+                  ? 'bg-yellow-400 text-gray-950'
+                  : 'bg-gray-800 text-gray-400 hover:text-yellow-300',
+              ]"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
       </div>
 

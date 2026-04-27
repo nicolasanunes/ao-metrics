@@ -46,7 +46,7 @@ export const PRODUCTION_ANIMALS: Record<ProductionKey, ProductionData> = {
     adultName: 'Cabras',
     specName: 'Criador de Cabras',
     yieldUnfocused: 0.7333,
-    yieldFocused: 1.2633,
+    yieldFocused: 1.2666,
     favFood: 'Nabos',
     hasSecondary: true,
     secondaryName: 'Leite de Cabra',
@@ -70,7 +70,7 @@ export const PRODUCTION_ANIMALS: Record<ProductionKey, ProductionData> = {
     adultName: 'Ovelhas',
     specName: 'Criador de Ovelhas',
     yieldUnfocused: 0.8667,
-    yieldFocused: 1.1367,
+    yieldFocused: 1.1334,
     favFood: 'Batatas',
     hasSecondary: true,
     secondaryName: 'Leite de Ovelha',
@@ -82,7 +82,7 @@ export const PRODUCTION_ANIMALS: Record<ProductionKey, ProductionData> = {
     adultName: 'Porcos',
     specName: 'Criador de Porcos',
     yieldUnfocused: 0.9111,
-    yieldFocused: 1.0911,
+    yieldFocused: 1.0889,
     favFood: 'Fardo de Milho',
     hasSecondary: false,
     secondaryYieldAvg: 0,
@@ -93,7 +93,7 @@ export const PRODUCTION_ANIMALS: Record<ProductionKey, ProductionData> = {
     adultName: 'Vacas',
     specName: 'Criador de Vacas',
     yieldUnfocused: 0.9333,
-    yieldFocused: 1.0633,
+    yieldFocused: 1.0666,
     favFood: 'Abóbora',
     hasSecondary: true,
     secondaryName: 'Leite de Vaca',
@@ -167,10 +167,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Novilho do Adepto',
     adultName: 'Potro do Adepto',
     specName: 'Criador de Bois',
-    yieldUnfocused: 0.7867,
-    yieldFocused: 0.9167,
+    yieldUnfocused: 0.39335,
+    yieldFocused: 0.52665,
     growthHoursBase: 92,
-    foodPer24h: 16,
+    foodPer24h: 14,
     maxNurtures: 2,
   },
   novilhoPerito: {
@@ -178,10 +178,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Novilho do Perito',
     adultName: 'Potro do Perito',
     specName: 'Criador de Bois',
-    yieldUnfocused: 0.7867,
-    yieldFocused: 0.8757,
+    yieldUnfocused: 0.262233,
+    yieldFocused: 0.351133,
     growthHoursBase: 140,
-    foodPer24h: 31,
+    foodPer24h: 28,
     maxNurtures: 3,
   },
   novilhoMestre: {
@@ -189,10 +189,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Novilho do Mestre',
     adultName: 'Potro do Mestre',
     specName: 'Criador de Bois',
-    yieldUnfocused: 0.8104,
-    yieldFocused: 0.8694,
+    yieldUnfocused: 0.2026,
+    yieldFocused: 0.2619,
     growthHoursBase: 188,
-    foodPer24h: 69,
+    foodPer24h: 63,
     maxNurtures: 4,
   },
   novilhoGraoMestre: {
@@ -200,10 +200,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Novilho do Grão Mestre',
     adultName: 'Potro do Grão Mestre',
     specName: 'Criador de Bois',
-    yieldUnfocused: 0.842,
-    yieldFocused: 0.882,
+    yieldUnfocused: 0.1684,
+    yieldFocused: 0.2079,
     growthHoursBase: 236,
-    foodPer24h: 165,
+    foodPer24h: 151,
     maxNurtures: 5,
   },
   novilhoAnciao: {
@@ -211,10 +211,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Novilho do Ancião',
     adultName: 'Potro do Ancião',
     specName: 'Criador de Bois',
-    yieldUnfocused: 0.8736,
-    yieldFocused: 0.8996,
+    yieldUnfocused: 0.1456,
+    yieldFocused: 0.1719,
     growthHoursBase: 284,
-    foodPer24h: 411,
+    foodPer24h: 376,
     maxNurtures: 6,
   },
   potroIniciante: {
@@ -233,10 +233,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Potro do Adepto',
     adultName: 'Cavalo do Adepto',
     specName: 'Criador de Cavalos',
-    yieldUnfocused: 0.7867,
-    yieldFocused: 0.9167,
+    yieldUnfocused: 0.39335,
+    yieldFocused: 0.52665,
     growthHoursBase: 92,
-    foodPer24h: 16,
+    foodPer24h: 14,
     maxNurtures: 2,
   },
   potroPerito: {
@@ -244,10 +244,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Potro do Perito',
     adultName: 'Cavalo do Perito',
     specName: 'Criador de Cavalos',
-    yieldUnfocused: 0.7867,
-    yieldFocused: 0.8757,
+    yieldUnfocused: 0.262233,
+    yieldFocused: 0.351133,
     growthHoursBase: 140,
-    foodPer24h: 31,
+    foodPer24h: 28,
     maxNurtures: 3,
   },
   potroMestre: {
@@ -255,10 +255,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Potro do Mestre',
     adultName: 'Cavalo do Mestre',
     specName: 'Criador de Cavalos',
-    yieldUnfocused: 0.8104,
-    yieldFocused: 0.8694,
+    yieldUnfocused: 0.2026,
+    yieldFocused: 0.2619,
     growthHoursBase: 188,
-    foodPer24h: 69,
+    foodPer24h: 63,
     maxNurtures: 4,
   },
   potroGraoMestre: {
@@ -266,10 +266,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Potro do Grão Mestre',
     adultName: 'Cavalo do Grão Mestre',
     specName: 'Criador de Cavalos',
-    yieldUnfocused: 0.842,
-    yieldFocused: 0.882,
+    yieldUnfocused: 0.1684,
+    yieldFocused: 0.2079,
     growthHoursBase: 236,
-    foodPer24h: 165,
+    foodPer24h: 151,
     maxNurtures: 5,
   },
   potroAnciao: {
@@ -277,10 +277,10 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     youngName: 'Potro do Ancião',
     adultName: 'Cavalo do Ancião',
     specName: 'Criador de Cavalos',
-    yieldUnfocused: 0.8736,
-    yieldFocused: 0.8996,
+    yieldUnfocused: 0.1456,
+    yieldFocused: 0.1719,
     growthHoursBase: 284,
-    foodPer24h: 411,
+    foodPer24h: 376,
     maxNurtures: 6,
   },
   gamoAdepto: {
@@ -289,9 +289,9 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     adultName: 'Veado Gigante Manso do Adepto',
     specName: 'Criador de Animais Raros',
     yieldUnfocused: 0.0,
-    yieldFocused: 0.18,
+    yieldFocused: 0.175,
     growthHoursBase: 92,
-    foodPer24h: 16,
+    foodPer24h: 14,
     maxNurtures: 2,
   },
   alceFilhote: {
@@ -302,7 +302,7 @@ export const RIDING_ANIMALS: Record<RidingKey, RidingData> = {
     yieldUnfocused: 0.0,
     yieldFocused: 0.06,
     growthHoursBase: 188,
-    foodPer24h: 69,
+    foodPer24h: 58,
     maxNurtures: 4,
   },
 }
@@ -518,9 +518,11 @@ export function usePastureCalculator() {
   )
   const focusRidingTotal = computed(() => focusRidingPerPasture.value * pastures.value)
 
-  // Revenue per pasture
+  // Revenue per pasture: 9 adults (1:1 from placed foals) + foals returned from yield
   const revenueRidingPerPasture = computed(
-    () => expectedFoalsPerPasture.value * priceRidingAdult.value,
+    () =>
+      animalsPerPasture * priceRidingAdult.value +
+      expectedFoalsPerPasture.value * priceRidingYoung.value,
   )
 
   // Cost per pasture (input animals + food)
@@ -539,6 +541,18 @@ export function usePastureCalculator() {
     if (revenueRidingPerPasture.value === 0) return null
     return (netProfitRidingPerPasture.value / revenueRidingPerPasture.value) * 100
   })
+
+  const isRidingSustainable = computed(() => expectedFoalsPerPasture.value >= animalsPerPasture)
+
+  const youngDeficitRidingTotal = computed(() =>
+    Math.max(0, 9 * pastures.value - Math.round(expectedFoalsTotal.value)),
+  )
+  const restockCostRidingTotal = computed(
+    () => youngDeficitRidingTotal.value * priceRidingYoung.value,
+  )
+  const netProfitAfterRestockRidingTotal = computed(
+    () => netProfitRidingTotal.value - restockCostRidingTotal.value,
+  )
 
   // Growth time display for riding
   const ridingGrowthHours = computed(() =>
@@ -667,6 +681,10 @@ export function usePastureCalculator() {
     costRidingTotal,
     netProfitRidingTotal,
     profitMarginRiding,
+    isRidingSustainable,
+    youngDeficitRidingTotal,
+    restockCostRidingTotal,
+    netProfitAfterRestockRidingTotal,
     ridingGrowthHours,
 
     // Secondary state

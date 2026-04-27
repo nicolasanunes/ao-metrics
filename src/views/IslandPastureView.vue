@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useAnnotationsStore } from '@/stores/annotations'
 import {
   usePastureCalculator,
   PRODUCTION_OPTIONS,
@@ -75,6 +76,10 @@ const {
   costRidingTotal,
   netProfitRidingTotal,
   profitMarginRiding,
+  isRidingSustainable,
+  youngDeficitRidingTotal,
+  restockCostRidingTotal,
+  netProfitAfterRestockRidingTotal,
   ridingGrowthHours,
   // Secondary state
   secondaryAnimal,
@@ -97,6 +102,72 @@ const {
   netProfitSecondaryTotal,
   profitMarginSecondary,
 } = usePastureCalculator()
+
+// ── Annotation chest picker (production tab) ────────────────────────────────
+const annotationsStore = useAnnotationsStore()
+
+const PRICE_FIELD_LABEL: Record<string, string> = {
+  sell_price_min: 'Venda Mín.',
+  sell_price_max: 'Venda Máx.',
+  buy_price_max: 'Compra',
+}
+
+const PRODUCTION_ANIMAL_IDS: Record<string, { young: string; adult: string; food: string }> = {
+  pinto: { young: 'T3_FARM_CHICKEN_BABY', adult: 'T3_FARM_CHICKEN_GROWN', food: 'T3_WHEAT' },
+  cabrito: { young: 'T4_FARM_GOAT_BABY', adult: 'T4_FARM_GOAT_GROWN', food: 'T4_TURNIP' },
+  gansinho: { young: 'T5_FARM_GOOSE_BABY', adult: 'T5_FARM_GOOSE_GROWN', food: 'T5_CABBAGE' },
+  cordeiro: { young: 'T6_FARM_SHEEP_BABY', adult: 'T6_FARM_SHEEP_GROWN', food: 'T6_POTATO' },
+  leitao: { young: 'T7_FARM_PIG_BABY', adult: 'T7_FARM_PIG_GROWN', food: 'T7_CORN' },
+  novilhoCorte: { young: 'T8_FARM_COW_BABY', adult: 'T8_FARM_COW_GROWN', food: 'T8_PUMPKIN' },
+}
+
+const youngItemId = computed(() => PRODUCTION_ANIMAL_IDS[productionAnimal.value]?.young ?? '')
+const adultItemId = computed(() => PRODUCTION_ANIMAL_IDS[productionAnimal.value]?.adult ?? '')
+const foodItemId = computed(() => PRODUCTION_ANIMAL_IDS[productionAnimal.value]?.food ?? '')
+
+const youngEntries = computed(() => annotationsStore.entriesForItem(youngItemId.value))
+const adultEntries = computed(() => annotationsStore.entriesForItem(adultItemId.value))
+const foodEntries = computed(() => annotationsStore.entriesForItem(foodItemId.value))
+
+const showYoungChest = ref(false)
+const showAdultChest = ref(false)
+const showFoodChest = ref(false)
+
+// ── Annotation chest picker (riding tab) ────────────────────────────────────
+const RIDING_ANIMAL_IDS: Record<string, { young: string; adult: string }> = {
+  potroIniciante: { young: 'T3_FARM_HORSE_BABY', adult: 'T3_FARM_HORSE_GROWN' },
+  potroAdepto: { young: 'T4_FARM_HORSE_BABY', adult: 'T4_FARM_HORSE_GROWN' },
+  potroPerito: { young: 'T5_FARM_HORSE_BABY', adult: 'T5_FARM_HORSE_GROWN' },
+  potroMestre: { young: 'T6_FARM_HORSE_BABY', adult: 'T6_FARM_HORSE_GROWN' },
+  potroGraoMestre: { young: 'T7_FARM_HORSE_BABY', adult: 'T7_FARM_HORSE_GROWN' },
+  potroAnciao: { young: 'T8_FARM_HORSE_BABY', adult: 'T8_FARM_HORSE_GROWN' },
+  novilhoIniciante: { young: 'T3_FARM_OX_BABY', adult: 'T3_FARM_OX_GROWN' },
+  novilhoAdepto: { young: 'T4_FARM_OX_BABY', adult: 'T4_FARM_OX_GROWN' },
+  novilhoPerito: { young: 'T5_FARM_OX_BABY', adult: 'T5_FARM_OX_GROWN' },
+  novilhoMestre: { young: 'T6_FARM_OX_BABY', adult: 'T6_FARM_OX_GROWN' },
+  novilhoGraoMestre: { young: 'T7_FARM_OX_BABY', adult: 'T7_FARM_OX_GROWN' },
+  novilhoAnciao: { young: 'T8_FARM_OX_BABY', adult: 'T8_FARM_OX_GROWN' },
+  gamoAdepto: { young: 'T4_FARM_GIANTSTAG_BABY', adult: 'T4_FARM_GIANTSTAG_GROWN' },
+  alceFilhote: { young: 'T6_FARM_GIANTSTAG_MOOSE_BABY', adult: 'T6_FARM_GIANTSTAG_MOOSE_GROWN' },
+}
+
+const ridingYoungItemId = computed(() => RIDING_ANIMAL_IDS[ridingAnimal.value]?.young ?? '')
+const ridingAdultItemId = computed(() => RIDING_ANIMAL_IDS[ridingAnimal.value]?.adult ?? '')
+
+const ridingYoungEntries = computed(() => annotationsStore.entriesForItem(ridingYoungItemId.value))
+const ridingAdultEntries = computed(() => annotationsStore.entriesForItem(ridingAdultItemId.value))
+
+const showRidingYoungChest = ref(false)
+const showRidingAdultChest = ref(false)
+
+// Offspring restock cost (when production is not self-sustaining)
+const youngDeficitTotal = computed(() =>
+  Math.max(0, 9 * pastures.value - Math.round(adultsTotal.value)),
+)
+const restockCostYoungTotal = computed(() => youngDeficitTotal.value * priceYoung.value)
+const netProfitAfterRestockYoungTotal = computed(
+  () => netProfitProdTotal.value - restockCostYoungTotal.value,
+)
 
 // Keep base food quantity at 18; the effectiveFoodMultiplier (×0.5) handles the fav-food discount
 watch(
@@ -431,11 +502,45 @@ watch(
           </h2>
           <div class="space-y-3">
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">
-                Preço de
-                <span class="text-yellow-300 font-semibold">{{ productionData.youngName }}</span>
-                (filhote)
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-gray-400">
+                  Preço de
+                  <span class="text-yellow-300 font-semibold">{{ productionData.youngName }}</span>
+                  (filhote)
+                </label>
+                <div class="relative">
+                  <button
+                    v-if="youngEntries.length"
+                    @click="showYoungChest = !showYoungChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
+                  >
+                    🪙 Baú <span class="font-bold">{{ youngEntries.length }}</span>
+                  </button>
+                  <div
+                    v-if="showYoungChest && youngEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in youngEntries"
+                      :key="i"
+                      @click="((priceYoung = entry.price), (showYoungChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 v-model.number="priceYoung"
@@ -445,11 +550,45 @@ watch(
               />
             </div>
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">
-                Preço de
-                <span class="text-yellow-300 font-semibold">{{ productionData.adultName }}</span>
-                (adulto)
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-gray-400">
+                  Preço de
+                  <span class="text-yellow-300 font-semibold">{{ productionData.adultName }}</span>
+                  (adulto)
+                </label>
+                <div class="relative">
+                  <button
+                    v-if="adultEntries.length"
+                    @click="showAdultChest = !showAdultChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
+                  >
+                    🪙 Baú <span class="font-bold">{{ adultEntries.length }}</span>
+                  </button>
+                  <div
+                    v-if="showAdultChest && adultEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in adultEntries"
+                      :key="i"
+                      @click="((priceAdult = entry.price), (showAdultChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 v-model.number="priceAdult"
@@ -459,9 +598,43 @@ watch(
               />
             </div>
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">
-                Preço da comida / por item <span class="text-gray-600 text-xs">(opcional)</span>
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-gray-400">
+                  Preço da comida / por item <span class="text-gray-600 text-xs">(opcional)</span>
+                </label>
+                <div class="relative">
+                  <button
+                    v-if="foodEntries.length"
+                    @click="showFoodChest = !showFoodChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
+                  >
+                    🪙 Baú <span class="font-bold">{{ foodEntries.length }}</span>
+                  </button>
+                  <div
+                    v-if="showFoodChest && foodEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in foodEntries"
+                      :key="i"
+                      @click="((priceFood = entry.price), (showFoodChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 v-model.number="priceFood"
@@ -583,7 +756,7 @@ watch(
 
       <!-- Results -->
       <div class="bg-gray-900 rounded-xl p-6">
-        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados — Produção</h2>
+        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados - Produção</h2>
 
         <!-- KPI per pasture -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -733,16 +906,18 @@ watch(
                 class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors"
               >
                 <td class="px-3 py-2 text-red-400">
-                  <span class="text-xs font-bold px-1 rounded mr-1 bg-gray-600 text-gray-100"
-                    >T?</span
+                  <span
+                    :class="['text-xs font-bold px-1 rounded mr-1', tierBg(productionData.tier)]"
+                    :style="{ color: tierTextColor(productionData.tier) }"
+                    >T{{ productionData.tier }}</span
                   >
-                  Comida (custo)
+                  {{ productionData.favFood }} (custo)
                 </td>
-                <td class="px-3 py-2 text-gray-400">—</td>
-                <td class="px-3 py-2">—</td>
+                <td class="px-3 py-2 text-gray-400">{{ (favFoodActive ? 9 : 18) * 9 }}</td>
+                <td class="px-3 py-2">{{ fmt(priceFood) }}</td>
                 <td class="px-3 py-2 text-red-400 font-semibold">−{{ fmt(foodCostPerPasture) }}</td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
-                  —
+                  {{ (favFoodActive ? 9 : 18) * 9 * pastures }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-red-400 font-semibold">
                   −{{ fmt(foodCostTotal) }}
@@ -869,6 +1044,40 @@ watch(
           <p v-else class="text-xs text-green-300 mt-2">
             ✓ Você recupera filhotes suficientes para manter ou expandir o ciclo de produção.
           </p>
+
+          <!-- Restock cost block (only when unsustainable and priceYoung is set) -->
+          <div
+            v-if="!isProductionSustainable && priceYoung > 0"
+            class="mt-4 pt-4 border-t border-yellow-700/40"
+          >
+            <p class="text-xs font-semibold text-yellow-300 uppercase tracking-wider mb-3">
+              Custo de Reposição de Filhotes
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">
+                  Déficit total ({{ pastures }} pasto{{ pastures !== 1 ? 's' : '' }})
+                </p>
+                <p class="font-semibold text-red-400">~{{ youngDeficitTotal }} filhote(s)</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Gasto p/ reposição (total)</p>
+                <p class="font-semibold text-orange-400">{{ fmt(restockCostYoungTotal) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Lucro após reposição (total)</p>
+                <p class="font-semibold" :class="profitColorClass(netProfitAfterRestockYoungTotal)">
+                  {{ fmt(netProfitAfterRestockYoungTotal) }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <p
+            v-else-if="!isProductionSustainable && priceYoung === 0"
+            class="text-xs text-gray-500 mt-3"
+          >
+            Informe o preço do filhote para calcular o custo de reposição.
+          </p>
         </div>
 
         <!-- Profitability -->
@@ -952,24 +1161,26 @@ watch(
             <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">Dados do animal</p>
             <div class="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <p class="text-gray-500 mb-0.5">Prole / nutrição (sem foco)</p>
+                <p class="text-gray-500 mb-0.5">Retorno base (sem foco)</p>
                 <p class="font-semibold text-gray-300">
-                  {{ (ridingData.yieldUnfocused * 100).toFixed(1) }}%
+                  {{ (ridingData.yieldUnfocused * ridingData.maxNurtures * 100).toFixed(2) }}%
                 </p>
               </div>
               <div>
-                <p class="text-gray-500 mb-0.5">Prole / nutrição (com foco)</p>
-                <p class="font-semibold text-green-400">
-                  {{ (ridingData.yieldFocused * 100).toFixed(1) }}%
+                <p class="text-gray-500 mb-0.5">Aumento com foco / dia</p>
+                <p class="font-semibold text-blue-400">
+                  +{{ ((ridingData.yieldFocused - ridingData.yieldUnfocused) * 100).toFixed(2) }}%
                 </p>
               </div>
               <div>
-                <p class="text-gray-500 mb-0.5">Nutrições máx. (premium)</p>
+                <p class="text-gray-500 mb-0.5">Dias com foco possíveis</p>
                 <p class="font-semibold text-yellow-300">{{ ridingData.maxNurtures }}×</p>
               </div>
               <div>
-                <p class="text-gray-500 mb-0.5">Comida / 24h</p>
-                <p class="font-semibold text-orange-300">{{ ridingData.foodPer24h }}</p>
+                <p class="text-gray-500 mb-0.5">Retorno total (todo foco)</p>
+                <p class="font-semibold text-green-400">
+                  {{ (ridingData.yieldFocused * ridingData.maxNurtures * 100).toFixed(2) }}%
+                </p>
               </div>
               <div>
                 <p class="text-gray-500 mb-0.5">Crescimento (sem premium)</p>
@@ -978,8 +1189,16 @@ watch(
                 </p>
               </div>
               <div>
-                <p class="text-gray-500 mb-0.5">Comida total / animal</p>
-                <p class="font-semibold text-orange-300">{{ foodPerAnimalRiding }}</p>
+                <p class="text-gray-500 mb-0.5">Comida / nutrição (44h)</p>
+                <p class="font-semibold text-orange-300">
+                  {{ ridingData.foodPer24h.toFixed(2).replace(/\.00$/, '') }}
+                </p>
+              </div>
+              <div>
+                <p class="text-gray-500 mb-0.5">Comida total / animal (ciclo)</p>
+                <p class="font-semibold text-orange-400">
+                  {{ foodPerAnimalRiding.toFixed(2).replace(/\.00$/, '') }}
+                </p>
               </div>
             </div>
             <div class="mt-2 pt-2 border-t border-gray-700 text-xs">
@@ -1234,10 +1453,44 @@ watch(
           </h2>
           <div class="space-y-3">
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">
-                Preço de
-                <span class="text-yellow-300 font-semibold">{{ ridingData.youngName }}</span>
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-gray-400">
+                  Preço de
+                  <span class="text-yellow-300 font-semibold">{{ ridingData.youngName }}</span>
+                </label>
+                <div class="relative">
+                  <button
+                    v-if="ridingYoungEntries.length"
+                    @click="showRidingYoungChest = !showRidingYoungChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
+                  >
+                    🪙 Baú <span class="font-bold">{{ ridingYoungEntries.length }}</span>
+                  </button>
+                  <div
+                    v-if="showRidingYoungChest && ridingYoungEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in ridingYoungEntries"
+                      :key="i"
+                      @click="((priceRidingYoung = entry.price), (showRidingYoungChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 v-model.number="priceRidingYoung"
@@ -1247,10 +1500,44 @@ watch(
               />
             </div>
             <div>
-              <label class="text-xs text-gray-400 mb-1 block">
-                Preço de
-                <span class="text-yellow-300 font-semibold">{{ ridingData.adultName }}</span>
-              </label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs text-gray-400">
+                  Preço de
+                  <span class="text-yellow-300 font-semibold">{{ ridingData.adultName }}</span>
+                </label>
+                <div class="relative">
+                  <button
+                    v-if="ridingAdultEntries.length"
+                    @click="showRidingAdultChest = !showRidingAdultChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
+                  >
+                    🪙 Baú <span class="font-bold">{{ ridingAdultEntries.length }}</span>
+                  </button>
+                  <div
+                    v-if="showRidingAdultChest && ridingAdultEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in ridingAdultEntries"
+                      :key="i"
+                      @click="((priceRidingAdult = entry.price), (showRidingAdultChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
               <input
                 type="number"
                 v-model.number="priceRidingAdult"
@@ -1344,14 +1631,14 @@ watch(
             </p>
             <div class="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <p class="text-xs text-gray-500 mb-0.5">{{ ridingData.adultName }} esperados</p>
+                <p class="text-xs text-gray-500 mb-0.5">{{ ridingData.youngName }} retornados</p>
                 <p class="font-semibold text-green-400">
                   ~{{ expectedFoalsPerPasture.toFixed(2) }}
                 </p>
               </div>
               <div>
-                <p class="text-xs text-gray-500 mb-0.5">Animais adultos retornados</p>
-                <p class="font-semibold text-green-300">9 / pasto</p>
+                <p class="text-xs text-gray-500 mb-0.5">{{ ridingData.adultName }} / pasto</p>
+                <p class="font-semibold text-green-300">9</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500 mb-0.5">Com foco / pasto</p>
@@ -1374,10 +1661,10 @@ watch(
 
       <!-- Results -->
       <div class="bg-gray-900 rounded-xl p-6">
-        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados — Montaria</h2>
+        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados - Montaria</h2>
 
         <!-- KPI per pasture -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div class="bg-gray-800 rounded-xl p-4 text-center">
             <p class="text-xs text-gray-400 mb-1">Receita / pasto</p>
             <p class="text-2xl font-bold text-yellow-300">{{ fmt(revenueRidingPerPasture) }}</p>
@@ -1396,16 +1683,21 @@ watch(
             <p class="text-xs text-gray-600 mt-1">prata</p>
           </div>
           <div class="bg-gray-800 rounded-xl p-4 text-center">
-            <p class="text-xs text-gray-400 mb-1">Filhotes / pasto</p>
+            <p class="text-xs text-gray-400 mb-1">Adultos / pasto</p>
+            <p class="text-2xl font-bold text-yellow-300">9</p>
+            <p class="text-xs text-gray-600 mt-1">{{ ridingData.adultName }}</p>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Filhotes retornados / pasto</p>
             <p class="text-2xl font-bold text-green-400">
               ~{{ expectedFoalsPerPasture.toFixed(1) }}
             </p>
-            <p class="text-xs text-gray-600 mt-1">{{ ridingData.adultName }}</p>
+            <p class="text-xs text-gray-600 mt-1">{{ ridingData.youngName }}</p>
           </div>
         </div>
 
         <!-- Multi-pasture totals -->
-        <div v-if="pastures > 1" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div v-if="pastures > 1" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div class="bg-blue-900/20 border border-blue-700/40 rounded-xl p-4 text-center">
             <p class="text-xs text-gray-400 mb-1">Receita total / {{ pastures }} pastos</p>
             <p class="text-xl font-bold text-yellow-300">{{ fmt(revenueRidingTotal) }}</p>
@@ -1428,7 +1720,11 @@ watch(
             </p>
           </div>
           <div class="bg-green-900/20 border border-green-700/40 rounded-xl p-4 text-center">
-            <p class="text-xs text-gray-400 mb-1">Filhotes totais / {{ pastures }} pastos</p>
+            <p class="text-xs text-gray-400 mb-1">Adultos totais / {{ pastures }} pastos</p>
+            <p class="text-xl font-bold text-yellow-300">{{ 9 * pastures }}</p>
+          </div>
+          <div class="bg-green-900/20 border border-green-700/40 rounded-xl p-4 text-center">
+            <p class="text-xs text-gray-400 mb-1">Filhotes retornados / {{ pastures }} pastos</p>
             <p class="text-xl font-bold text-green-400">~{{ expectedFoalsTotal.toFixed(1) }}</p>
           </div>
         </div>
@@ -1452,6 +1748,7 @@ watch(
               </tr>
             </thead>
             <tbody>
+              <!-- Adults row (all placed foals become adults, 1:1) -->
               <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
                 <td class="px-3 py-2 text-yellow-300">
                   <span
@@ -1459,22 +1756,52 @@ watch(
                     :style="{ color: tierTextColor(ridingData.tier) }"
                     >T{{ ridingData.tier }}</span
                   >
-                  {{ ridingData.adultName }}
+                  {{ ridingData.adultName }} (adultos)
                 </td>
-                <td class="px-3 py-2 text-gray-400">~{{ expectedFoalsPerPasture.toFixed(2) }}</td>
+                <td class="px-3 py-2 text-gray-400">9</td>
                 <td class="px-3 py-2">{{ fmt(priceRidingAdult) }}</td>
                 <td class="px-3 py-2 text-green-400 font-semibold">
-                  {{ fmt(revenueRidingPerPasture) }}
+                  {{ fmt(9 * priceRidingAdult) }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
+                  {{ 9 * pastures }}
+                </td>
+                <td v-if="pastures > 1" class="px-3 py-2 text-green-400 font-semibold">
+                  {{ fmt(9 * pastures * priceRidingAdult) }}
+                </td>
+              </tr>
+              <!-- Foals returned row (yield chance) -->
+              <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
+                <td class="px-3 py-2 text-yellow-300">
+                  <span
+                    :class="['text-xs font-bold px-1 rounded mr-1', tierBg(ridingData.tier)]"
+                    :style="{ color: tierTextColor(ridingData.tier) }"
+                    >T{{ ridingData.tier }}</span
+                  >
+                  {{ ridingData.youngName }} (retorno)
+                </td>
+                <td class="px-3 py-2 text-gray-400">~{{ expectedFoalsPerPasture.toFixed(2) }}</td>
+                <td class="px-3 py-2">{{ fmt(priceRidingYoung) }}</td>
+                <td class="px-3 py-2 text-green-400 font-semibold">
+                  {{ fmt(expectedFoalsPerPasture * priceRidingYoung) }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-gray-400 border-l border-gray-700">
                   ~{{ expectedFoalsTotal.toFixed(2) }}
                 </td>
                 <td v-if="pastures > 1" class="px-3 py-2 text-green-400 font-semibold">
-                  {{ fmt(revenueRidingTotal) }}
+                  {{ fmt(expectedFoalsTotal * priceRidingYoung) }}
                 </td>
               </tr>
+              <!-- Foals placed (cost) -->
               <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
-                <td class="px-3 py-2 text-red-400">{{ ridingData.youngName }} (custo)</td>
+                <td class="px-3 py-2 text-red-400">
+                  <span
+                    :class="['text-xs font-bold px-1 rounded mr-1', tierBg(ridingData.tier)]"
+                    :style="{ color: tierTextColor(ridingData.tier) }"
+                    >T{{ ridingData.tier }}</span
+                  >
+                  {{ ridingData.youngName }} (custo)
+                </td>
                 <td class="px-3 py-2 text-gray-400">9</td>
                 <td class="px-3 py-2">{{ fmt(priceRidingYoung) }}</td>
                 <td class="px-3 py-2 text-red-400 font-semibold">
@@ -1576,6 +1903,99 @@ watch(
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Foal sustainability banner -->
+        <div
+          :class="[
+            'rounded-xl p-4 mb-4 border',
+            isRidingSustainable
+              ? 'bg-green-900/20 border-green-700/40'
+              : 'bg-yellow-900/20 border-yellow-700/40',
+          ]"
+        >
+          <h3
+            :class="[
+              'text-sm font-semibold uppercase tracking-wider mb-2',
+              isRidingSustainable ? 'text-green-300' : 'text-yellow-300',
+            ]"
+          >
+            Sustentabilidade de Foco
+          </h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Filhotes colocados / pasto</p>
+              <p class="text-gray-300 font-semibold">9</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">Filhotes retornados / pasto</p>
+              <p
+                :class="[
+                  'font-semibold',
+                  isRidingSustainable ? 'text-green-400' : 'text-yellow-300',
+                ]"
+              >
+                ~{{ expectedFoalsPerPasture.toFixed(2) }}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">% retorno / nutrição com foco</p>
+              <p class="text-gray-300 font-semibold">
+                {{ (ridingData.yieldFocused * 100).toFixed(2) }}%
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 mb-0.5">% retorno / nutrição sem foco</p>
+              <p class="text-gray-300 font-semibold">
+                {{ (ridingData.yieldUnfocused * 100).toFixed(2) }}%
+              </p>
+            </div>
+          </div>
+          <p v-if="!isRidingSustainable" class="text-xs text-yellow-300 mt-2">
+            ⚠️ Com {{ ridingAnimalsWithFocus }} animal(is) com foco e a combinação atual de %
+            retorno, você produz menos filhotes do que os colocados. Considere usar mais foco ou
+            aumentar a especialização.
+          </p>
+          <p v-else class="text-xs text-green-300 mt-2">
+            ✓ Você recupera filhotes suficientes para manter ou expandir o ciclo de montaria.
+          </p>
+
+          <!-- Restock cost block (only when unsustainable and priceRidingYoung is set) -->
+          <div
+            v-if="!isRidingSustainable && priceRidingYoung > 0"
+            class="mt-4 pt-4 border-t border-yellow-700/40"
+          >
+            <p class="text-xs font-semibold text-yellow-300 uppercase tracking-wider mb-3">
+              Custo de Reposição de Filhotes
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">
+                  Déficit total ({{ pastures }} pasto{{ pastures !== 1 ? 's' : '' }})
+                </p>
+                <p class="font-semibold text-red-400">~{{ youngDeficitRidingTotal }} filhote(s)</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Gasto p/ reposição (total)</p>
+                <p class="font-semibold text-orange-400">{{ fmt(restockCostRidingTotal) }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-0.5">Lucro após reposição (total)</p>
+                <p
+                  class="font-semibold"
+                  :class="profitColorClass(netProfitAfterRestockRidingTotal)"
+                >
+                  {{ fmt(netProfitAfterRestockRidingTotal) }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <p
+            v-else-if="!isRidingSustainable && priceRidingYoung === 0"
+            class="text-xs text-gray-500 mt-3"
+          >
+            Informe o preço do filhote para calcular o custo de reposição.
+          </p>
         </div>
 
         <!-- Profitability -->
@@ -1947,7 +2367,7 @@ watch(
 
       <!-- Results -->
       <div class="bg-gray-900 rounded-xl p-6">
-        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados — Produção Secundária</h2>
+        <h2 class="text-lg font-semibold text-yellow-400 mb-5">Resultados - Produção Secundária</h2>
 
         <!-- KPI per pasture -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

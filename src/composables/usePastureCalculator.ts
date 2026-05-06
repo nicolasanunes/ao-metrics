@@ -450,7 +450,9 @@ export function usePastureCalculator() {
     return (netProfitProdPerPasture.value / revenueProdPerPasture.value) * 100
   })
 
-  const isProductionSustainable = computed(() => adultsPerPasture.value >= animalsPerPasture)
+  const isProductionSustainable = computed(
+    () => adultsPerPasture.value >= animalsPerPasture - 0.005,
+  )
 
   // Growth time display for production
   const growthHoursProd = computed(() => (premium.value ? 22 : 44))

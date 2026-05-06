@@ -1690,7 +1690,7 @@ watch(
           <div class="bg-gray-800 rounded-xl p-4 text-center">
             <p class="text-xs text-gray-400 mb-1">Filhotes retornados / pasto</p>
             <p class="text-2xl font-bold text-green-400">
-              ~{{ expectedFoalsPerPasture.toFixed(1) }}
+              ~{{ expectedFoalsPerPasture.toFixed(2) }}
             </p>
             <p class="text-xs text-gray-600 mt-1">{{ ridingData.youngName }}</p>
           </div>
@@ -1725,7 +1725,7 @@ watch(
           </div>
           <div class="bg-green-900/20 border border-green-700/40 rounded-xl p-4 text-center">
             <p class="text-xs text-gray-400 mb-1">Filhotes retornados / {{ pastures }} pastos</p>
-            <p class="text-xl font-bold text-green-400">~{{ expectedFoalsTotal.toFixed(1) }}</p>
+            <p class="text-xl font-bold text-green-400">~{{ expectedFoalsTotal.toFixed(2) }}</p>
           </div>
         </div>
 

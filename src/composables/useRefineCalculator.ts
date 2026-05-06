@@ -34,8 +34,15 @@ export function useRefineCalculator() {
   const rawPrice = ref(0)
   const subPrice = ref(0)
   const quantity = ref(1)
-  const sellPrice = ref(0)
+  const sellPriceDirect = ref(0)
+  const sellPriceOrder = ref(0)
   const stationFee = ref(0) // prata por 100 de nutrição
+  const hasPremium = ref(true)
+  const saleType = ref<'direct' | 'order'>('order')
+
+  const sellPrice = computed(() =>
+    saleType.value === 'direct' ? sellPriceDirect.value : sellPriceOrder.value,
+  )
 
   // ── Watchers ─────────────────────────────────────────────────────────────
 
@@ -255,6 +262,35 @@ export function useRefineCalculator() {
     return (profitPerItem.value / netCost) * 100
   })
 
+  // ── Market tax & after-tax profit ─────────────────────────────────────────
+
+  const marketTaxRate = computed(() => {
+    if (hasPremium.value) {
+      return saleType.value === 'direct' ? 0.04 : 0.065
+    } else {
+      return saleType.value === 'direct' ? 0.08 : 0.105
+    }
+  })
+
+  const sellPriceAfterTax = computed(() => sellPrice.value * (1 - marketTaxRate.value))
+
+  const profitPerItemAfterTax = computed(() =>
+    sellPrice.value > 0
+      ? sellPriceAfterTax.value - costPerItem.value - nutritionCostPerItem.value
+      : null,
+  )
+
+  const totalProfitAfterTax = computed(() =>
+    profitPerItemAfterTax.value !== null ? profitPerItemAfterTax.value * quantity.value : null,
+  )
+
+  const profitMarginPctAfterTax = computed(() => {
+    if (profitPerItemAfterTax.value === null) return null
+    const netCost = costPerItem.value + nutritionCostPerItem.value
+    if (netCost === 0) return null
+    return (profitPerItemAfterTax.value / netCost) * 100
+  })
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return {
@@ -276,7 +312,11 @@ export function useRefineCalculator() {
     subPrice,
     quantity,
     sellPrice,
+    sellPriceDirect,
+    sellPriceOrder,
     stationFee,
+    hasPremium,
+    saleType,
     // Recipe
     hasSubtiers,
     hasStoneSubtier,
@@ -337,5 +377,11 @@ export function useRefineCalculator() {
     profitPerItem,
     totalProfit,
     profitMarginPct,
+    // Market tax & after-tax profit
+    marketTaxRate,
+    sellPriceAfterTax,
+    profitPerItemAfterTax,
+    totalProfitAfterTax,
+    profitMarginPctAfterTax,
   }
 }

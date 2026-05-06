@@ -34,7 +34,11 @@ const {
   subPrice,
   quantity,
   sellPrice,
+  sellPriceDirect,
+  sellPriceOrder,
   stationFee,
+  hasPremium,
+  saleType,
   // Recipe
   hasSubtiers,
   hasStoneSubtier,
@@ -94,6 +98,12 @@ const {
   profitPerItem,
   totalProfit,
   profitMarginPct,
+  // Market tax & after-tax profit
+  marketTaxRate,
+  sellPriceAfterTax,
+  profitPerItemAfterTax,
+  totalProfitAfterTax,
+  profitMarginPctAfterTax,
 } = useRefineCalculator()
 
 const annotationsStore = useAnnotationsStore()
@@ -146,7 +156,8 @@ const sellEntries = computed(() => annotationsStore.entriesForItem(refinedItemId
 
 const showRawChest = ref(false)
 const showSubChest = ref(false)
-const showSellChest = ref(false)
+const showSellDirectChest = ref(false)
+const showSellOrderChest = ref(false)
 
 const PRICE_FIELD_LABEL: Record<string, string> = {
   sell_price_min: 'Venda Mín.',
@@ -621,10 +632,11 @@ const PRICE_FIELD_LABEL: Record<string, string> = {
             <p class="text-xs text-gray-600 mt-1">Nutrição por refino: {{ nutritionPerAction }}</p>
           </div>
           <div>
-            <div class="flex items-center gap-1">
-              <label class="text-xs text-gray-400 mb-1 block"> Preço de venda </label>
+            <!-- Refined item badge + label -->
+            <div class="flex items-center gap-1.5 mb-2">
+              <label class="text-xs text-gray-400">Preço de venda</label>
               <div
-                class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs mb-1.5 w-fit"
+                class="bg-yellow-400/15 border border-yellow-400/30 text-yellow-300 px-1 py-0.5 rounded flex items-center gap-1.5 text-xs w-fit"
               >
                 <span :class="['text-xs font-bold px-1 rounded', refinedBadge.bg]"
                   ><span :style="{ color: refinedBadge.tierColor }">T{{ refinedBadge.tier }}</span
@@ -636,48 +648,146 @@ const PRICE_FIELD_LABEL: Record<string, string> = {
                 >
                 {{ refinedDisplayName }}
               </div>
-              <span class="text-gray-600 text-xs mb-1">(opcional)</span>
-              <!-- Chest picker trigger (sell) -->
-              <div class="relative mb-1.5 ml-auto">
-                <button
-                  v-if="sellEntries.length"
-                  @click="showSellChest = !showSellChest"
-                  class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
-                  title="Usar valor do baú de anotações"
-                >
-                  🪙 Baú <span class="font-bold">{{ sellEntries.length }}</span>
-                </button>
-                <div
-                  v-if="showSellChest && sellEntries.length"
-                  class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
-                >
-                  <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
-                    Selecionar valor anotado
-                  </p>
+            </div>
+
+            <!-- Direct sale price -->
+            <div class="mb-2">
+              <div class="flex items-center mb-1">
+                <label class="text-xs text-gray-400 mr-1">Venda direta</label>
+                <span class="text-gray-600 text-xs">(opcional)</span>
+                <div class="relative">
                   <button
-                    v-for="(entry, i) in sellEntries"
-                    :key="i"
-                    @click="((sellPrice = entry.price), (showSellChest = false))"
-                    class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    v-if="sellEntries.length"
+                    @click="showSellDirectChest = !showSellDirectChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
                   >
-                    <span class="text-xs text-gray-400"
-                      >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
-                    >
-                    <span
-                      class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
-                      >{{ entry.price.toLocaleString('pt-BR') }}</span
-                    >
+                    🪙 Baú <span class="font-bold">{{ sellEntries.length }}</span>
                   </button>
+                  <div
+                    v-if="showSellDirectChest && sellEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in sellEntries"
+                      :key="i"
+                      @click="((sellPriceDirect = entry.price), (showSellDirectChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
                 </div>
               </div>
+              <input
+                type="number"
+                v-model.number="sellPriceDirect"
+                min="0"
+                placeholder="0"
+                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
+              />
             </div>
-            <input
-              type="number"
-              v-model.number="sellPrice"
-              min="0"
-              placeholder="0"
-              class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
-            />
+
+            <!-- Sell order price -->
+            <div>
+              <div class="flex items-center mb-1">
+                <label class="text-xs text-gray-400 mr-1">Pedido de venda</label>
+                <span class="text-gray-600 text-xs">(opcional)</span>
+                <div class="relative">
+                  <button
+                    v-if="sellEntries.length"
+                    @click="showSellOrderChest = !showSellOrderChest"
+                    class="flex items-center gap-1 text-xs bg-yellow-400/15 hover:bg-yellow-400/30 border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    title="Usar valor do baú de anotações"
+                  >
+                    🪙 Baú <span class="font-bold">{{ sellEntries.length }}</span>
+                  </button>
+                  <div
+                    v-if="showSellOrderChest && sellEntries.length"
+                    class="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded-xl shadow-xl min-w-[220px] p-2"
+                  >
+                    <p class="text-xs text-gray-500 px-2 pb-1 mb-1 border-b border-gray-700">
+                      Selecionar valor anotado
+                    </p>
+                    <button
+                      v-for="(entry, i) in sellEntries"
+                      :key="i"
+                      @click="((sellPriceOrder = entry.price), (showSellOrderChest = false))"
+                      class="w-full text-left flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer group"
+                    >
+                      <span class="text-xs text-gray-400"
+                        >{{ PRICE_FIELD_LABEL[entry.priceField] }} · {{ entry.city }}</span
+                      >
+                      <span
+                        class="text-sm font-semibold text-yellow-300 group-hover:text-yellow-200"
+                        >{{ entry.price.toLocaleString('pt-BR') }}</span
+                      >
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <input
+                type="number"
+                v-model.number="sellPriceOrder"
+                min="0"
+                placeholder="0"
+                class="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-yellow-400 placeholder-gray-600"
+              />
+            </div>
+          </div>
+
+          <!-- Market tax settings -->
+          <div class="border-t border-gray-700 pt-3">
+            <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Taxa de Mercado
+            </h3>
+            <label
+              class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors mb-3"
+            >
+              <input type="checkbox" v-model="hasPremium" class="accent-yellow-400" />
+              <span class="text-sm">Premium ativo</span>
+            </label>
+            <div class="flex flex-col gap-1.5">
+              <label
+                v-for="opt in [
+                  { label: 'Pedido de venda', value: 'order' },
+                  { label: 'Venda direta', value: 'direct' },
+                ]"
+                :key="opt.value"
+                class="flex items-center gap-2 cursor-pointer hover:text-yellow-300 transition-colors"
+              >
+                <input
+                  type="radio"
+                  :value="opt.value"
+                  v-model="saleType"
+                  class="accent-yellow-400"
+                />
+                <span class="text-sm">{{ opt.label }}</span>
+                <span class="ml-auto text-xs text-gray-500">
+                  {{
+                    opt.value === 'direct'
+                      ? hasPremium
+                        ? '4%'
+                        : '8%'
+                      : hasPremium
+                        ? '6,5%'
+                        : '10,5%'
+                  }}
+                </span>
+              </label>
+            </div>
+            <p class="text-xs text-yellow-400 mt-2">
+              Taxa aplicada: {{ (marketTaxRate * 100).toFixed(1) }}%
+            </p>
           </div>
         </div>
       </div>
@@ -1055,6 +1165,66 @@ const PRICE_FIELD_LABEL: Record<string, string> = {
               >
               <template v-else-if="profitMarginPct !== null">Margem ótima</template>
             </p>
+          </div>
+        </div>
+
+        <!-- After-tax profit -->
+        <div class="mt-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Após taxa de mercado
+            </h4>
+            <span
+              class="text-xs bg-yellow-400/20 text-yellow-300 border border-yellow-400/30 px-2 py-0.5 rounded-full font-semibold"
+            >
+              {{ (marketTaxRate * 100).toFixed(1) }}% ({{
+                hasPremium ? 'Premium' : 'Sem premium'
+              }}
+              · {{ saleType === 'direct' ? 'Venda direta' : 'Pedido de venda' }})
+            </span>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <p class="text-xs text-gray-400 mb-1">Preço líquido recebido</p>
+              <p class="text-xl font-bold text-gray-200">{{ fmt(sellPriceAfterTax) }}</p>
+              <p class="text-xs text-gray-500 mt-1">
+                −{{ fmt(sellPrice - sellPriceAfterTax) }} de taxa
+              </p>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <p class="text-xs text-gray-400 mb-1">Lucro / item após taxa</p>
+              <p class="text-xl font-bold" :class="profitColorClass(profitPerItemAfterTax)">
+                {{ profitPerItemAfterTax !== null ? fmt(profitPerItemAfterTax) : '—' }}
+              </p>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <p class="text-xs text-gray-400 mb-1">Lucro total após taxa ({{ quantity }}×)</p>
+              <p class="text-xl font-bold" :class="profitColorClass(totalProfitAfterTax)">
+                {{ totalProfitAfterTax !== null ? fmt(totalProfitAfterTax) : '—' }}
+              </p>
+            </div>
+            <div class="rounded-xl p-3 text-center" :class="marginBgClass(profitMarginPctAfterTax)">
+              <p class="text-xs text-gray-400 mb-1">Margem após taxa</p>
+              <p class="text-2xl font-bold" :class="marginColorClass(profitMarginPctAfterTax)">
+                {{
+                  profitMarginPctAfterTax !== null ? profitMarginPctAfterTax.toFixed(1) + '%' : '—'
+                }}
+              </p>
+              <p class="text-xs mt-1" :class="marginColorClass(profitMarginPctAfterTax)">
+                <template v-if="profitMarginPctAfterTax !== null && profitMarginPctAfterTax < 0"
+                  >Prejuízo</template
+                >
+                <template
+                  v-else-if="profitMarginPctAfterTax !== null && profitMarginPctAfterTax < 10"
+                  >Margem baixa</template
+                >
+                <template
+                  v-else-if="profitMarginPctAfterTax !== null && profitMarginPctAfterTax < 20"
+                  >Margem boa</template
+                >
+                <template v-else-if="profitMarginPctAfterTax !== null">Margem ótima</template>
+              </p>
+            </div>
           </div>
         </div>
       </div>

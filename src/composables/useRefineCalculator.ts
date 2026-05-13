@@ -181,6 +181,12 @@ export function useRefineCalculator() {
   const subReturn = computed(() => subGross.value * returnRate.value)
   const totalReturn = computed(() => totalGross.value * returnRate.value)
 
+  // Quantity of resources returned (fractional) per refine action and scaled
+  const rawReturnQty = computed(() => (rawQty.value ?? 0) * returnRate.value)
+  const subReturnQty = computed(() => subQty.value * returnRate.value)
+  const rawReturnQtyTotal = computed(() => rawReturnQty.value * refineActions.value)
+  const subReturnQtyTotal = computed(() => subReturnQty.value * refineActions.value)
+
   // Refine actions needed (one action can yield multiple items for stone with enchantment)
   const refineActions = computed(() => Math.ceil(quantity.value / outputYield.value))
 
@@ -349,6 +355,10 @@ export function useRefineCalculator() {
     rawReturn,
     subReturn,
     totalReturn,
+    rawReturnQty,
+    subReturnQty,
+    rawReturnQtyTotal,
+    subReturnQtyTotal,
     refineActions,
     // Scaled totals
     rawQtyTotal,

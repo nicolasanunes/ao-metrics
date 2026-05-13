@@ -7,6 +7,11 @@ import {
   ALL_CITIES,
   SUBTIER_COLORS,
   TIER_WEIGHT,
+  RAW_NAMES,
+  REFINED_NAMES,
+  ENCHANTMENT_SUFFIX,
+  RAW_QTY,
+  tierBadge,
   fmt,
   fmtWeight,
   profitColorClass,
@@ -168,6 +173,119 @@ const PRICE_FIELD_LABEL: Record<string, string> = {
   sell_price_max: 'Venda Máx.',
   buy_price_max: 'Compra',
 }
+
+// ── Refine chain ────────────────────────────────────────────────────────────
+interface ChainStep {
+  tier: number
+  rawEnc: number
+  outEnc: number
+  subEnc: number // -1 = no sub-ingredient
+  rawName: string
+  refinedName: string
+  subRefinedName: string
+  refinedNeeded: number // how many refined items needed from this step
+  actions: number
+  rawQtyPerAction: number
+  subQtyPerAction: number
+  outputYieldPerAction: number
+  actualOutput: number // actions × outputYield (may exceed refinedNeeded)
+  grossRaw: number
+  returnedRaw: number
+  netRaw: number
+  subConsumed: number
+  returnedSub: number
+}
+
+const chainSteps = computed((): ChainStep[] => {
+  if (tier.value < 2) return []
+  const rate = returnRate.value
+  const matKey = material.value
+  const isStone = matKey === 'stone'
+  const targetEnc = isStone ? 0 : enchantment.value
+  const steps: ChainStep[] = []
+  let neededRefined = quantity.value
+
+  for (let t = tier.value; t >= 2; t--) {
+    const rawQtyT = RAW_QTY[t] ?? 0
+    let rawEncT = 0
+    let outEncT = 0
+    let subEncT = -1
+    let subQtyT = 0
+    let outputYieldT = 1
+
+    if (isStone && t === tier.value && t >= 4) {
+      // Stone target tier: raw uses stoneEnchantment, sub/output scale with 2^se
+      rawEncT = stoneEnchantment.value
+      outEncT = 0
+      subEncT = 0
+      subQtyT = Math.pow(2, stoneEnchantment.value)
+      outputYieldT = Math.pow(2, stoneEnchantment.value)
+    } else if (!isStone && targetEnc > 0 && t >= 4) {
+      // Non-stone enchanted: T4 uses base T3 sub; T5+ sub shares enchantment
+      rawEncT = targetEnc
+      outEncT = targetEnc
+      subEncT = t === 4 ? 0 : targetEnc
+      subQtyT = 1
+    } else {
+      // Base recipe: T2, T3, non-enchanted, or stone intermediate tiers
+      subEncT = t > 2 ? 0 : -1
+      subQtyT = t > 2 ? 1 : 0
+    }
+
+    const actions = Math.ceil(neededRefined / outputYieldT)
+    const grossRaw = rawQtyT * actions
+    const returnedRaw = grossRaw * rate
+    const netRaw = grossRaw - returnedRaw
+    const subConsumed = subQtyT * actions
+    const returnedSub = subConsumed * rate
+    const safeSubEnc = subEncT >= 0 ? subEncT : 0
+
+    steps.unshift({
+      tier: t,
+      rawEnc: rawEncT,
+      outEnc: outEncT,
+      subEnc: subEncT,
+      rawName: (RAW_NAMES[matKey]?.[t] ?? '') + (ENCHANTMENT_SUFFIX[rawEncT] ?? ''),
+      refinedName: (REFINED_NAMES[matKey]?.[t] ?? '') + (ENCHANTMENT_SUFFIX[outEncT] ?? ''),
+      subRefinedName:
+        t > 2
+          ? (REFINED_NAMES[matKey]?.[t - 1] ?? '') + (ENCHANTMENT_SUFFIX[safeSubEnc] ?? '')
+          : '',
+      refinedNeeded: neededRefined,
+      actions,
+      rawQtyPerAction: rawQtyT,
+      subQtyPerAction: subQtyT,
+      outputYieldPerAction: outputYieldT,
+      actualOutput: actions * outputYieldT,
+      grossRaw,
+      returnedRaw,
+      netRaw,
+      subConsumed,
+      returnedSub,
+    })
+
+    neededRefined = subConsumed - returnedSub
+  }
+
+  return steps
+})
+
+const chainBagText = computed(() => {
+  if (chainSteps.value.length === 0) return ''
+  const last = chainSteps.value[chainSteps.value.length - 1]
+  const rawList = chainSteps.value.map((s) => `${s.grossRaw}\u00d7 ${s.rawName}`).join(', ')
+  const intermediates = chainSteps.value
+    .slice(0, -1)
+    .map((s) => s.refinedName)
+    .join(', ')
+  return (
+    `Para produzir ${last.actualOutput}\u00d7 ${last.refinedName}, leve ao refinador: ${rawList}. ` +
+    (intermediates
+      ? `Os refinados intermediários (${intermediates}) serão produzidos em cadeia no próprio refinador. `
+      : '') +
+    `Você sairá somente com ${last.actualOutput}\u00d7 ${last.refinedName} na mochila.`
+  )
+})
 </script>
 
 <template>
@@ -1246,6 +1364,293 @@ const PRICE_FIELD_LABEL: Record<string, string> = {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Cadeia completa de refino ──────────────────────────────────────── -->
+    <div class="bg-gray-900 rounded-xl p-6 mt-4">
+      <div class="flex flex-wrap items-center gap-2 mb-1">
+        <h2 class="text-lg font-semibold text-yellow-400">Cadeia Completa de Refino</h2>
+        <span class="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
+          {{ returnRatePct }}% de retorno por etapa
+        </span>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">
+        Matérias-primas necessárias do T2 até {{ refinedDisplayName }}, aproveitando o retorno de
+        cada etapa para reduzir a demanda da etapa anterior.
+      </p>
+
+      <!-- Bag summary sentence -->
+      <p
+        v-if="chainBagText"
+        class="text-xs text-gray-300 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 mb-4 leading-relaxed"
+      >
+        {{ chainBagText }}
+      </p>
+
+      <!-- Chain path breadcrumb -->
+      <div class="flex items-center gap-1 mb-4 flex-wrap">
+        <template v-for="(step, idx) in chainSteps" :key="step.tier">
+          <span
+            :class="[
+              'text-xs font-bold px-1.5 py-0.5 rounded',
+              tierBadge(step.tier, step.outEnc).bg,
+            ]"
+          >
+            <span :style="{ color: tierBadge(step.tier, step.outEnc).tierColor }"
+              >T{{ step.tier }}</span
+            ><span
+              v-if="step.outEnc > 0"
+              :style="{ color: tierBadge(step.tier, step.outEnc).subtierColor! }"
+              >.{{ step.outEnc }}</span
+            >
+          </span>
+          <svg
+            v-if="idx < chainSteps.length - 1"
+            class="w-3 h-3 text-gray-600 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </template>
+      </div>
+
+      <!-- Step-by-step breakdown -->
+      <div class="space-y-2 mb-4">
+        <div
+          v-for="(step, idx) in chainSteps"
+          :key="step.tier"
+          class="bg-gray-800 rounded-xl p-3 border-l-2"
+          :class="idx === chainSteps.length - 1 ? 'border-yellow-400' : 'border-gray-700'"
+        >
+          <!-- Header -->
+          <div class="flex items-center gap-2 mb-2">
+            <span
+              :class="[
+                'text-xs font-bold px-1.5 py-0.5 rounded',
+                tierBadge(step.tier, step.outEnc).bg,
+              ]"
+            >
+              <span :style="{ color: tierBadge(step.tier, step.outEnc).tierColor }"
+                >T{{ step.tier }}</span
+              ><span
+                v-if="step.outEnc > 0"
+                :style="{ color: tierBadge(step.tier, step.outEnc).subtierColor! }"
+                >.{{ step.outEnc }}</span
+              >
+            </span>
+            <span class="text-sm font-semibold text-yellow-300">{{ step.refinedName }}</span>
+            <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
+              <span>{{ step.actions }}× ação{{ step.actions !== 1 ? 'ões' : '' }}</span>
+              <span class="text-gray-600">→</span>
+              <span class="text-green-400 font-semibold">{{ step.actualOutput }}× produzidos</span>
+            </div>
+          </div>
+
+          <!-- Resources -->
+          <div class="flex flex-col gap-1 text-xs">
+            <!-- Raw material -->
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span :class="['font-bold px-1 rounded', tierBadge(step.tier, step.rawEnc).bg]">
+                <span :style="{ color: tierBadge(step.tier, step.rawEnc).tierColor }"
+                  >T{{ step.tier }}</span
+                ><span
+                  v-if="step.rawEnc > 0"
+                  :style="{ color: tierBadge(step.tier, step.rawEnc).subtierColor! }"
+                  >.{{ step.rawEnc }}</span
+                >
+              </span>
+              <span class="text-gray-300">{{ step.rawName }}</span>
+              <span class="text-gray-600">·</span>
+              <span class="text-red-400">{{ step.grossRaw }}× bruto</span>
+              <span class="text-gray-600">/</span>
+              <span class="text-green-400 font-semibold"
+                >~{{ Math.round(step.netRaw) }}× líquido</span
+              >
+              <span class="text-gray-600 text-[10px]"
+                >(+{{ Math.round(step.returnedRaw) }}× retorno)</span
+              >
+            </div>
+
+            <!-- Sub-ingredient -->
+            <div
+              v-if="step.subEnc >= 0 && step.subQtyPerAction > 0"
+              class="flex items-center gap-1.5 flex-wrap"
+            >
+              <span :class="['font-bold px-1 rounded', tierBadge(step.tier - 1, step.subEnc).bg]">
+                <span :style="{ color: tierBadge(step.tier - 1, step.subEnc).tierColor }"
+                  >T{{ step.tier - 1 }}</span
+                ><span
+                  v-if="step.subEnc > 0"
+                  :style="{ color: tierBadge(step.tier - 1, step.subEnc).subtierColor! }"
+                  >.{{ step.subEnc }}</span
+                >
+              </span>
+              <span class="text-gray-300">{{ step.subRefinedName }}</span>
+              <span class="text-gray-600">·</span>
+              <span class="text-orange-400">{{ step.subConsumed }}× consumido</span>
+              <span class="text-gray-600 text-[10px]"
+                >(+{{ step.returnedSub.toFixed(1) }}× retorno)</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary table: raw to gather + refined produced per tier -->
+      <div class="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Recursos necessários — resumo completo
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-gray-700">
+                <th class="text-left text-gray-500 font-medium pb-2 pr-3 whitespace-nowrap">
+                  Etapa
+                </th>
+                <th class="text-left text-gray-500 font-medium pb-2 pr-3">Matéria-prima bruta</th>
+                <th class="text-right text-gray-500 font-medium pb-2 pr-3 whitespace-nowrap">
+                  Bruto
+                </th>
+                <th class="text-right text-gray-500 font-medium pb-2 pr-6 whitespace-nowrap">
+                  Líquido
+                </th>
+                <th class="text-left text-gray-500 font-medium pb-2 pr-3">Refinado produzido</th>
+                <th class="text-right text-gray-500 font-medium pb-2 whitespace-nowrap">Qtd.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(step, idx) in chainSteps"
+                :key="step.tier"
+                class="border-b border-gray-700/40 last:border-0"
+              >
+                <!-- Etapa badge -->
+                <td class="py-2 pr-3">
+                  <span
+                    :class="[
+                      'font-bold px-1.5 py-0.5 rounded text-[11px]',
+                      tierBadge(step.tier, step.outEnc).bg,
+                    ]"
+                  >
+                    <span :style="{ color: tierBadge(step.tier, step.outEnc).tierColor }"
+                      >T{{ step.tier }}</span
+                    ><span
+                      v-if="step.outEnc > 0"
+                      :style="{ color: tierBadge(step.tier, step.outEnc).subtierColor! }"
+                      >.{{ step.outEnc }}</span
+                    >
+                  </span>
+                </td>
+
+                <!-- Raw material -->
+                <td class="py-2 pr-3">
+                  <div class="flex items-center gap-1.5">
+                    <span
+                      :class="[
+                        'font-bold px-1 py-0.5 rounded text-[10px]',
+                        tierBadge(step.tier, step.rawEnc).bg,
+                      ]"
+                    >
+                      <span :style="{ color: tierBadge(step.tier, step.rawEnc).tierColor }"
+                        >T{{ step.tier }}</span
+                      ><span
+                        v-if="step.rawEnc > 0"
+                        :style="{ color: tierBadge(step.tier, step.rawEnc).subtierColor! }"
+                        >.{{ step.rawEnc }}</span
+                      >
+                    </span>
+                    <span class="text-gray-300 whitespace-nowrap">{{ step.rawName }}</span>
+                  </div>
+                </td>
+
+                <!-- Gross qty -->
+                <td class="py-2 pr-3 text-right font-mono text-red-400 whitespace-nowrap">
+                  {{ step.grossRaw }}×
+                </td>
+
+                <!-- Net qty -->
+                <td class="py-2 pr-6 text-right font-mono text-green-400 whitespace-nowrap">
+                  ~{{ Math.round(step.netRaw) }}×
+                </td>
+
+                <!-- Refined produced -->
+                <td class="py-2 pr-3">
+                  <div class="flex items-center gap-1.5">
+                    <span
+                      :class="[
+                        'font-bold px-1 py-0.5 rounded text-[10px]',
+                        tierBadge(step.tier, step.outEnc).bg,
+                      ]"
+                    >
+                      <span :style="{ color: tierBadge(step.tier, step.outEnc).tierColor }"
+                        >T{{ step.tier }}</span
+                      ><span
+                        v-if="step.outEnc > 0"
+                        :style="{ color: tierBadge(step.tier, step.outEnc).subtierColor! }"
+                        >.{{ step.outEnc }}</span
+                      >
+                    </span>
+                    <span
+                      :class="[
+                        'whitespace-nowrap',
+                        idx === chainSteps.length - 1
+                          ? 'font-semibold text-yellow-300'
+                          : 'text-gray-300',
+                      ]"
+                      >{{ step.refinedName }}</span
+                    >
+                    <span
+                      v-if="idx < chainSteps.length - 1"
+                      class="text-gray-600 text-[10px] whitespace-nowrap"
+                    >
+                      → sub T{{ step.tier + 1 }}
+                    </span>
+                    <span v-else class="text-yellow-400 text-[10px] font-bold whitespace-nowrap">
+                      ✓ produto final
+                    </span>
+                  </div>
+                </td>
+
+                <!-- Qty produced -->
+                <td
+                  class="py-2 text-right font-mono font-bold whitespace-nowrap"
+                  :class="idx === chainSteps.length - 1 ? 'text-yellow-300' : 'text-gray-400'"
+                >
+                  {{ step.actualOutput }}×
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer totals -->
+        <div
+          class="mt-3 pt-3 border-t border-gray-700 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500"
+        >
+          <span>
+            Total bruto:
+            <span class="text-red-400 font-semibold">
+              {{ chainSteps.reduce((s, st) => s + st.grossRaw, 0) }}×
+            </span>
+            raw
+          </span>
+          <span>
+            Total líquido:
+            <span class="text-green-400 font-semibold">
+              ~{{ Math.round(chainSteps.reduce((s, st) => s + st.netRaw, 0)) }}×
+            </span>
+            raw
+          </span>
         </div>
       </div>
     </div>
